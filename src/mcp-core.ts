@@ -46,7 +46,7 @@ const baseInputSchema = z.object({
     .string()
     .min(1)
     .describe(
-      'Video URL (supported: YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion) or YouTube video ID'
+      'Video URL (supported: YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit) or YouTube video ID'
     ),
   format: z
     .enum(['srt', 'vtt', 'ass', 'lrc'])
@@ -265,7 +265,7 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
     {
       title: 'Get video transcript',
       description:
-        'Fetch cleaned subtitles as plain text for a video (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion). Input: URL only. Uses auto-discovery for type/language and returns the first chunk with default size.',
+        'Fetch cleaned subtitles as plain text for a video (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit). Input: URL only. Uses auto-discovery for type/language and returns the first chunk with default size.',
       inputSchema: baseInputSchema,
       outputSchema: transcriptOutputSchema,
       annotations: { readOnlyHint: true, idempotentHint: true },
@@ -886,7 +886,7 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
         {
           uri: SUPPORTED_PLATFORMS_URI,
           mimeType: 'text/plain',
-          text: 'Supported platforms: YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion. You can also pass a YouTube video ID directly.',
+          text: 'Supported platforms: YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit. You can also pass a YouTube video ID directly.',
         },
       ],
     })

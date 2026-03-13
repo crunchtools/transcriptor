@@ -45,6 +45,10 @@ export const ALLOWED_VIDEO_DOMAINS = [
   'www.vkvideo.ru',
   'dailymotion.com',
   'www.dailymotion.com',
+  'reddit.com',
+  'www.reddit.com',
+  'old.reddit.com',
+  'v.redd.it',
 ] as const;
 
 // TypeBox schema for subtitle request.
@@ -53,7 +57,7 @@ export const GetSubtitlesRequestSchema = Type.Object({
   url: Type.String({
     minLength: 1,
     description:
-      'Video URL from a supported platform (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion) or YouTube video ID',
+      'Video URL from a supported platform (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit) or YouTube video ID',
   }),
   type: Type.Optional(
     Type.Union([Type.Literal('official'), Type.Literal('auto')], {
@@ -90,7 +94,8 @@ export function shouldAutoDiscoverSubtitles(request: GetSubtitlesRequest): boole
 export const GetAvailableSubtitlesRequestSchema = Type.Object({
   url: Type.String({
     minLength: 1,
-    description: 'Video URL from a supported platform or YouTube video ID',
+    description:
+      'Video URL from a supported platform (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit) or YouTube video ID',
   }),
 });
 
@@ -100,7 +105,8 @@ export type GetAvailableSubtitlesRequest = Static<typeof GetAvailableSubtitlesRe
 export const GetVideoInfoRequestSchema = Type.Object({
   url: Type.String({
     minLength: 1,
-    description: 'Video URL from a supported platform or YouTube video ID',
+    description:
+      'Video URL from a supported platform (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit) or YouTube video ID',
   }),
 });
 
@@ -209,7 +215,7 @@ export function validateVideoRequest(url: string): { url: string } {
   const normalized = normalizeVideoInput(url);
   if (!normalized) {
     throw new ValidationError(
-      'Please provide a valid video URL (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion) or YouTube video ID',
+      'Please provide a valid video URL (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit) or YouTube video ID',
       'Invalid video URL'
     );
   }

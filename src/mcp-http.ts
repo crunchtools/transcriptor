@@ -194,7 +194,7 @@ function getServerCard(): {
         name: 'get_transcript',
         title: 'Get video transcript',
         description:
-          'Fetch cleaned subtitles as plain text for a video (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion). Input: URL only. Uses auto-discovery for type/language and returns the first chunk with default size.',
+          'Fetch cleaned subtitles as plain text for a video (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit). Input: URL only. Uses auto-discovery for type/language and returns the first chunk with default size.',
         inputSchema: {
           type: 'object',
           properties: { url: { type: 'string', description: 'Video URL or YouTube video ID' } },

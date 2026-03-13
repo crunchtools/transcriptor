@@ -70,7 +70,7 @@ For **long videos** where you need the full SRT/VTT or exact timestamps:
 | **get_video_info** | Metadata (title, channel, duration, tags, etc.) for SEO or filtering. |
 | **get_available_subtitles** | List official/auto languages before choosing `type`/`lang` in get_raw_subtitles. |
 
-All tools accept a **video URL** from any supported platform (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion) or a YouTube video ID.
+All tools accept a **video URL** from any supported platform (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit) or a YouTube video ID.
 
 ## See also
 

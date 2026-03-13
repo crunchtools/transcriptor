@@ -227,7 +227,7 @@ fastify.register(async (instance) => {
       info: {
         title: 'YT Captions API',
         description:
-          'API for downloading subtitles and video metadata from supported platforms (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion)',
+          'API for downloading subtitles and video metadata from supported platforms (YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit)',
         version: API_VERSION,
       },
       servers: [{ url: 'http://localhost:3000', description: 'Development server' }],

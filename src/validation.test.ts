@@ -126,6 +126,10 @@ describe('validation', () => {
         // Dailymotion
         'https://dailymotion.com/video/abc',
         'https://www.dailymotion.com/video/abc',
+        // Reddit
+        'https://www.reddit.com/r/subreddit/comments/abc123/title/',
+        'https://old.reddit.com/r/videos/comments/xyz456/post_title/',
+        'https://v.redd.it/video_id',
       ];
       supportedPlatformUrls.forEach((url) => {
         expect(isValidSupportedUrl(url)).toBe(true);
@@ -170,6 +174,11 @@ describe('validation', () => {
           'https://vkvideo.ru/playlist/-220754053_5/video-220754053_456243238',
         ],
         ['https://www.dailymotion.com/video/abc', 'https://www.dailymotion.com/video/abc'],
+        [
+          'https://www.reddit.com/r/subreddit/comments/abc123/title/',
+          'https://www.reddit.com/r/subreddit/comments/abc123/title/',
+        ],
+        ['https://v.redd.it/video_id', 'https://v.redd.it/video_id'],
       ];
       platformUrls.forEach(([input, expected]) => {
         expect(normalizeVideoInput(input)).toBe(expected);

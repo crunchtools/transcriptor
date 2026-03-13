@@ -12,7 +12,7 @@
 
   <p>
     An MCP server (stdio + HTTP/SSE) that fetches video transcripts/subtitles via <code>yt-dlp</code>,
-    with pagination for large responses. Supports YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion. <strong>Whisper fallback</strong> — transcribes audio when subtitles are unavailable (local or OpenAI API). Works with Cursor and other MCP hosts.
+    with pagination for large responses. Supports YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit. <strong>Whisper fallback</strong> — transcribes audio when subtitles are unavailable (local or OpenAI API). Works with Cursor and other MCP hosts.
   </p>
 
   <p>
@@ -41,7 +41,7 @@ It also includes an optional **REST API** (Fastify), but MCP is the primary focu
 Transcriptor MCP is the best choice when you need **transcripts and metadata** for AI, summarization, or content analysis — without downloading video or audio files:
 
 - **Transcripts and subtitles** — cleaned text or raw SRT/VTT; multi-language; **Whisper fallback** when subtitles are unavailable (local or OpenAI).
-- **Multi-platform** — YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion.
+- **Multi-platform** — YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit.
 - **Remote and production** — MCP over HTTP/SSE, optional auth, Redis cache, Prometheus metrics; **connect in one click** via [Smithery](https://smithery.ai/servers/samson-art/transcriptor-mcp) with no local install.
 - **No media downloads** — we focus on text and metadata only. For downloading videos or audio.
 
@@ -165,7 +165,7 @@ For more MCP configuration examples, see [`docs/quick-start.mcp.md`](docs/quick-
 
 All URL-based tools share the same base input:
 
-- `url` (string, required) – Video URL from a supported platform or YouTube video ID. Supported: YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion.
+- `url` (string, required) – Video URL from a supported platform or YouTube video ID. Supported: YouTube, Twitter/X, Instagram, TikTok, Twitch, Vimeo, Facebook, Bilibili, VK, Dailymotion, Reddit.
 
 `get_raw_subtitles` supports pagination; `get_transcript` returns the first chunk only (no pagination input). Pagination parameters for `get_raw_subtitles`:
 
