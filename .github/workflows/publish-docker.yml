@@ -11,8 +11,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g. 0.4.7 or v0.4.7); must match an existing tag'
-        required: true
+        description: 'Version (e.g. 0.4.7 or v0.4.7); required unless latest_only'
+        required: false
+      latest_only:
+        description: 'Publish only :latest (build from default branch, no version tag)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   publish:
@@ -20,13 +25,27 @@ jobs:
     outputs:
       version: ${{ steps.tag.outputs.version }}
     steps:
+      - name: Validate workflow_dispatch inputs
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ inputs.latest_only }}" != "true" ]; then
+            if [ -z "${{ inputs.version }}" ]; then
+              echo "::error::version is required when latest_only is false. Set version or use latest_only=true."
+              exit 1
+            fi
+          fi
+
       - name: Get ref to build
         id: ref
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            v="${{ inputs.version }}"
-            [ "${v#v}" = "$v" ] && v="v$v"
-            echo "ref=refs/tags/$v" >> $GITHUB_OUTPUT
+            if [ "${{ inputs.latest_only }}" = "true" ]; then
+              echo "ref=refs/heads/${{ github.event.repository.default_branch || 'main' }}" >> $GITHUB_OUTPUT
+            else
+              v="${{ inputs.version }}"
+              [ "${v#v}" = "$v" ] && v="v$v"
+              echo "ref=refs/tags/$v" >> $GITHUB_OUTPUT
+            fi
           elif [ "${{ github.event_name }}" = "release" ]; then
             echo "ref=refs/tags/${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
           else
@@ -49,14 +68,20 @@ jobs:
       - name: Extract tag
         id: tag
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            v="${{ inputs.version }}"
-          elif [ "${{ github.event_name }}" = "release" ]; then
-            v="${{ github.event.release.tag_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.latest_only }}" = "true" ]; then
+            version=$(jq -r .version package.json)
+            echo "latest_only=true" >> $GITHUB_OUTPUT
           else
-            v="${{ github.ref_name }}"
+            echo "latest_only=false" >> $GITHUB_OUTPUT
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              v="${{ inputs.version }}"
+            elif [ "${{ github.event_name }}" = "release" ]; then
+              v="${{ github.event.release.tag_name }}"
+            else
+              v="${{ github.ref_name }}"
+            fi
+            version="${v#v}"
           fi
-          version="${v#v}"
           echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Build and push REST API image
@@ -66,9 +91,7 @@ jobs:
           file: ./Dockerfile
           target: api
           push: true
-          tags: |
-            artsamsonov/transcriptor-mcp-api:${{ steps.tag.outputs.version }}
-            artsamsonov/transcriptor-mcp-api:latest
+          tags: ${{ steps.tag.outputs.latest_only == 'true' && 'artsamsonov/transcriptor-mcp-api:latest' || format('artsamsonov/transcriptor-mcp-api:{0}\nartsamsonov/transcriptor-mcp-api:latest', steps.tag.outputs.version) }}
           platforms: linux/amd64,linux/arm64
 
       - name: Build and push MCP image
@@ -78,7 +101,5 @@ jobs:
           file: ./Dockerfile
           target: mcp
           push: true
-          tags: |
-            artsamsonov/transcriptor-mcp:${{ steps.tag.outputs.version }}
-            artsamsonov/transcriptor-mcp:latest
+          tags: ${{ steps.tag.outputs.latest_only == 'true' && 'artsamsonov/transcriptor-mcp:latest' || format('artsamsonov/transcriptor-mcp:{0}\nartsamsonov/transcriptor-mcp:latest', steps.tag.outputs.version) }}
           platforms: linux/amd64,linux/arm64
