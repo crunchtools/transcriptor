@@ -103,3 +103,9 @@ jobs:
           push: true
           tags: ${{ steps.tag.outputs.latest_only == 'true' && 'artsamsonov/transcriptor-mcp:latest' || format('artsamsonov/transcriptor-mcp:{0}\nartsamsonov/transcriptor-mcp:latest', steps.tag.outputs.version) }}
           platforms: linux/amd64,linux/arm64
+
+      - name: Log yt-dlp version in image
+        run: |
+          IMG="artsamsonov/transcriptor-mcp-api:${{ steps.tag.outputs.latest_only == 'true' && 'latest' || steps.tag.outputs.version }}"
+          docker pull "$IMG"
+          echo "::notice::yt-dlp in image $IMG: $(docker run --rm $IMG yt-dlp --version 2>/dev/null | head -1)"
