@@ -63,12 +63,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract tag
+      - name: Extract tag and image tags
         id: tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.latest_only }}" = "true" ]; then
             version=$(jq -r .version package.json)
             echo "latest_only=true" >> $GITHUB_OUTPUT
+            echo "api_tags=artsamsonov/transcriptor-mcp-api:latest" >> $GITHUB_OUTPUT
+            echo "mcp_tags=artsamsonov/transcriptor-mcp:latest" >> $GITHUB_OUTPUT
           else
             echo "latest_only=false" >> $GITHUB_OUTPUT
             if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -79,6 +81,18 @@ jobs:
               v="${{ github.ref_name }}"
             fi
             version="${v#v}"
+            {
+              echo "api_tags<<EOF"
+              echo "artsamsonov/transcriptor-mcp-api:$version"
+              echo "artsamsonov/transcriptor-mcp-api:latest"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+            {
+              echo "mcp_tags<<EOF"
+              echo "artsamsonov/transcriptor-mcp:$version"
+              echo "artsamsonov/transcriptor-mcp:latest"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
           fi
           echo "version=$version" >> $GITHUB_OUTPUT
 
@@ -89,7 +103,7 @@ jobs:
           file: ./Dockerfile
           target: api
           push: true
-          tags: ${{ steps.tag.outputs.latest_only == 'true' && 'artsamsonov/transcriptor-mcp-api:latest' || format('artsamsonov/transcriptor-mcp-api:{0}\nartsamsonov/transcriptor-mcp-api:latest', steps.tag.outputs.version) }}
+          tags: ${{ steps.tag.outputs.api_tags }}
           platforms: linux/amd64,linux/arm64
 
       - name: Build and push MCP image
@@ -99,7 +113,7 @@ jobs:
           file: ./Dockerfile
           target: mcp
           push: true
-          tags: ${{ steps.tag.outputs.latest_only == 'true' && 'artsamsonov/transcriptor-mcp:latest' || format('artsamsonov/transcriptor-mcp:{0}\nartsamsonov/transcriptor-mcp:latest', steps.tag.outputs.version) }}
+          tags: ${{ steps.tag.outputs.mcp_tags }}
           platforms: linux/amd64,linux/arm64
 
       - name: Log yt-dlp version in image
