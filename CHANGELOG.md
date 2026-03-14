@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-03-14
+
+### Added
+
+- **VTT word-by-word deduplication:** `parseVTT` now groups and deduplicates consecutive cues with identical text, fixing duplicated words in word-level VTT subtitles (e.g. from YouTube auto-generated captions).
+
+### Changed
+
+- **Subtitle validation and download logic:** Refactored `validateAndDownloadSubtitles` — introduced `throwNoSubtitlesError` for centralized "subtitles not found" handling; split auto-discovery and explicit-request flows into `handleAutoDiscoverFlow` and `handleExplicitRequestFlow` for clearer structure and maintainability.
+- **Error messages:** Improved guidance for subtitle availability and Whisper fallback attempts when subtitles are not found.
+- **README and documentation:** Refined introduction and connection options; added "supported platforms" section emphasizing multi-platform support; clarified Whisper fallback and Redis caching in `docs/configuration.md`; streamlined quick-start with Smithery and Glama no-install options.
+
 ## [0.6.6] - 2026-03-13
 
 ### Added
