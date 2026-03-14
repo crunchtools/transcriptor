@@ -1,10 +1,10 @@
 import { execFile, type ExecFileException } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { promisify } from 'util';
-import { copyFile, readFile, stat, unlink } from 'fs/promises';
+import { promisify } from 'node:util';
+import { copyFile, readFile, stat, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { FastifyBaseLogger } from 'fastify';
 
 const execFileAsync = promisify(execFile);
@@ -16,7 +16,7 @@ export function urlToSafeBase(url: string, prefix: string): string {
 }
 
 function isExecFileException(error: unknown): error is ExecFileException {
-  return error instanceof Error && typeof (error as ExecFileException).code !== 'undefined';
+  return error instanceof Error && (error as ExecFileException).code !== undefined;
 }
 
 type YtDlpChapter = {
@@ -1206,8 +1206,11 @@ function parseSRT(content: string, logger?: FastifyBaseLogger): string {
   return textLines.join(' ');
 }
 
+const VTT_TIMESTAMP_RE = /^\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}/;
+
 /**
- * Parses VTT format
+ * Parses VTT format. Groups text by cue (timestamp block) and deduplicates
+ * consecutive cues with identical text (word-by-word VTT format).
  * @param content - VTT subtitle content
  * @param logger - Fastify logger instance for structured logging
  */
@@ -1215,6 +1218,7 @@ function parseVTT(content: string, logger?: FastifyBaseLogger): string {
   logger?.debug('Parsing VTT content');
   const lines = content.split('\n');
   const textLines: string[] = [];
+  let prevCueText = '';
   let i = 0;
 
   // Skip WEBVTT header and metadata
@@ -1226,35 +1230,54 @@ function parseVTT(content: string, logger?: FastifyBaseLogger): string {
   }
 
   while (i < lines.length) {
-    const line = lines[i].trim();
+    const line = lines[i];
+    const trimmed = line.trim();
 
     // Skip empty lines
-    if (line === '') {
+    if (trimmed === '') {
       i++;
       continue;
     }
 
-    // Skip timestamps (format: 00:00:00.000 --> 00:00:00.000)
-    if (/^\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}/.test(line)) {
+    // Timestamp = start of new cue
+    if (VTT_TIMESTAMP_RE.test(trimmed)) {
       i++;
-      continue;
-    }
-
-    // Skip styles and settings
-    if (line.startsWith('STYLE') || line.startsWith('::cue') || line.startsWith('NOTE')) {
-      i++;
-      continue;
-    }
-
-    // This is subtitle text
-    if (line.length > 0) {
-      const cleanLine = cleanSubtitleLine(line);
-
-      if (cleanLine.length > 0) {
-        textLines.push(cleanLine);
+      const cueLines: string[] = [];
+      while (i < lines.length) {
+        const l = lines[i].trim();
+        if (l === '') {
+          i++;
+          continue;
+        }
+        if (VTT_TIMESTAMP_RE.test(l)) break;
+        if (l.startsWith('STYLE') || l.startsWith('::cue') || l.startsWith('NOTE')) {
+          i++;
+          continue;
+        }
+        const clean = cleanSubtitleLine(l);
+        if (clean) cueLines.push(clean);
+        i++;
       }
+      const cueText = cueLines.join(' ').trim();
+      if (cueText && cueText !== prevCueText) {
+        textLines.push(cueText);
+        prevCueText = cueText;
+      }
+      continue;
     }
 
+    // Skip styles and settings outside cue blocks
+    if (trimmed.startsWith('STYLE') || trimmed.startsWith('::cue') || trimmed.startsWith('NOTE')) {
+      i++;
+      continue;
+    }
+
+    // Orphan text (malformed VTT) - treat as single-line cue
+    const clean = cleanSubtitleLine(trimmed);
+    if (clean && clean !== prevCueText) {
+      textLines.push(clean);
+      prevCueText = clean;
+    }
     i++;
   }
 

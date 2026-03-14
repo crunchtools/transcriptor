@@ -246,6 +246,25 @@ Hello world`;
       const result = parseSubtitles(vttContent);
       expect(result).toBe('Hello world');
     });
+
+    it('should deduplicate word-by-word VTT cues with identical text', () => {
+      const vttContent = `WEBVTT
+
+00:00:00.000 --> 00:00:00.520
+<u>Dearly</u> beloved, we are gathered here
+today to pay our respects to MCP, which
+
+00:00:00.520 --> 00:00:00.900
+Dearly <u>beloved,</u> we are gathered here
+today to pay our respects to MCP, which
+
+00:00:05.000 --> 00:00:06.000
+<u>This</u> is new phrase`;
+      const result = parseSubtitles(vttContent);
+      expect(result).toBe(
+        'Dearly beloved, we are gathered here today to pay our respects to MCP, which This is new phrase'
+      );
+    });
   });
 
   describe('downloadSubtitles', () => {
