@@ -434,8 +434,13 @@ async function handleAutoDiscoverFlow(
   const cacheKey = `sub:${url}:auto-discovery:${format ?? 'default'}`;
   const cached = await get(cacheKey);
   if (cached !== undefined) {
-    recordCacheHit();
-    return JSON.parse(cached) as SubtitleResult;
+    try {
+      const parsed = JSON.parse(cached) as SubtitleResult;
+      recordCacheHit();
+      return parsed;
+    } catch (e) {
+      logger?.warn({ err: e, cacheKey }, 'Corrupted cache entry, treating as miss');
+    }
   }
   recordCacheMiss();
 
@@ -473,8 +478,13 @@ async function handleExplicitRequestFlow(
   const cacheKey = `sub:${url}:${type}:${sanitizedLang}:${format ?? 'default'}`;
   const cached = await get(cacheKey);
   if (cached !== undefined) {
-    recordCacheHit();
-    return JSON.parse(cached) as SubtitleResult;
+    try {
+      const parsed = JSON.parse(cached) as SubtitleResult;
+      recordCacheHit();
+      return parsed;
+    } catch (e) {
+      logger?.warn({ err: e, cacheKey }, 'Corrupted cache entry, treating as miss');
+    }
   }
   recordCacheMiss();
 
@@ -556,8 +566,17 @@ export async function validateAndFetchAvailableSubtitles(
   const cacheKey = `avail:${url}`;
   const cached = await get(cacheKey);
   if (cached !== undefined) {
-    recordCacheHit();
-    return JSON.parse(cached) as { videoId: string; official: string[]; auto: string[] };
+    try {
+      const parsed = JSON.parse(cached) as {
+        videoId: string;
+        official: string[];
+        auto: string[];
+      };
+      recordCacheHit();
+      return parsed;
+    } catch (e) {
+      logger?.warn({ err: e, cacheKey }, 'Corrupted cache entry, treating as miss');
+    }
   }
   recordCacheMiss();
 
@@ -594,11 +613,16 @@ export async function validateAndFetchVideoInfo(
   const cacheKey = `info:${url}`;
   const cached = await get(cacheKey);
   if (cached !== undefined) {
-    recordCacheHit();
-    return JSON.parse(cached) as {
-      videoId: string;
-      info: Awaited<ReturnType<typeof fetchVideoInfo>>;
-    };
+    try {
+      const parsed = JSON.parse(cached) as {
+        videoId: string;
+        info: Awaited<ReturnType<typeof fetchVideoInfo>>;
+      };
+      recordCacheHit();
+      return parsed;
+    } catch (e) {
+      logger?.warn({ err: e, cacheKey }, 'Corrupted cache entry, treating as miss');
+    }
   }
   recordCacheMiss();
 
@@ -628,11 +652,16 @@ export async function validateAndFetchVideoChapters(
   const cacheKey = `chapters:${url}`;
   const cached = await get(cacheKey);
   if (cached !== undefined) {
-    recordCacheHit();
-    return JSON.parse(cached) as {
-      videoId: string;
-      chapters: Awaited<ReturnType<typeof fetchVideoChapters>>;
-    };
+    try {
+      const parsed = JSON.parse(cached) as {
+        videoId: string;
+        chapters: Awaited<ReturnType<typeof fetchVideoChapters>>;
+      };
+      recordCacheHit();
+      return parsed;
+    } catch (e) {
+      logger?.warn({ err: e, cacheKey }, 'Corrupted cache entry, treating as miss');
+    }
   }
   recordCacheMiss();
 
