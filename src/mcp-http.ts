@@ -649,7 +649,10 @@ async function start() {
   }
 }
 
+let isShuttingDown = false;
 const shutdown = async (signal: string) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   app.log.info(`Received ${signal}, starting graceful shutdown...`);
 
   const shutdownTimeout = process.env.SHUTDOWN_TIMEOUT

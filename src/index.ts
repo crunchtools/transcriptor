@@ -421,7 +421,10 @@ const start = async () => {
 };
 
 // Graceful shutdown
+let isShuttingDown = false;
 const shutdown = async (signal: string) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   fastify.log.info(`Received ${signal}, starting graceful shutdown...`);
 
   const shutdownTimeout = process.env.SHUTDOWN_TIMEOUT
