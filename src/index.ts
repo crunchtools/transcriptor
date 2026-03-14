@@ -22,6 +22,7 @@ import {
 import { version as API_VERSION } from './version.js';
 import { checkYtDlpAtStartup } from './yt-dlp-check.js';
 import { close as closeCache, ping as cachePing } from './cache.js';
+import { setupLifecycle } from './lifecycle.js';
 import * as Sentry from '@sentry/node';
 import {
   recordRequest,
@@ -421,57 +422,11 @@ const start = async () => {
   }
 };
 
-// Graceful shutdown
-let isShuttingDown = false;
-const shutdown = async (signal: string) => {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-  fastify.log.info(`Received ${signal}, starting graceful shutdown...`);
-
-  const shutdownTimeout = parseIntEnv('SHUTDOWN_TIMEOUT', 10000); // 10 seconds default
-
-  // Timer for forced termination if shutdown takes too long
-  const forceShutdownTimer = setTimeout(() => {
-    fastify.log.warn('Shutdown timeout reached, forcing exit...');
-    process.exit(1);
-  }, shutdownTimeout);
-
-  try {
-    // Stop accepting new requests and wait for current ones to complete
-    await fastify.close();
-    await closeCache();
-    clearTimeout(forceShutdownTimer);
-    fastify.log.info('Server closed successfully');
-    process.exit(0);
-  } catch (err) {
-    clearTimeout(forceShutdownTimer);
-    const error = err instanceof Error ? err : new Error(String(err));
-    fastify.log.error(error, 'Error during shutdown');
-    Sentry.captureException(error);
-    process.exit(1);
-  }
-};
-
-// Handle termination signals
-process.on('SIGTERM', () => {
-  void shutdown('SIGTERM');
-});
-
-process.on('SIGINT', () => {
-  void shutdown('SIGINT');
-});
-
-// Handle unhandled errors
-process.on('unhandledRejection', (reason) => {
-  const error = reason instanceof Error ? reason : new Error(String(reason));
-  fastify.log.error(error, 'Unhandled Rejection');
-  Sentry.captureException(error);
-});
-
-process.on('uncaughtException', (error) => {
-  fastify.log.error(error, 'Uncaught Exception');
-  Sentry.captureException(error);
-  void shutdown('uncaughtException');
+setupLifecycle({
+  server: fastify,
+  closeCache,
+  log: fastify.log,
+  shutdownSuccessMessage: 'Server closed successfully',
 });
 
 void start();

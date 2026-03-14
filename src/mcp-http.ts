@@ -9,6 +9,7 @@ import type {
 import { createSseTransport } from './sse-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { close as closeCache } from './cache.js';
+import { setupLifecycle } from './lifecycle.js';
 import {
   getFailedSubtitlesUrls,
   renderPrometheus,
@@ -646,55 +647,12 @@ async function start() {
   }
 }
 
-let isShuttingDown = false;
-const shutdown = async (signal: string) => {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-  app.log.info(`Received ${signal}, starting graceful shutdown...`);
-
-  const shutdownTimeout = parseIntEnv('SHUTDOWN_TIMEOUT', 10000);
-
-  const forceShutdownTimer = setTimeout(() => {
-    app.log.warn('Shutdown timeout reached, forcing exit...');
-    process.exit(1);
-  }, shutdownTimeout);
-
-  try {
-    await app.close();
-    await closeCache();
-    clearTimeout(forceShutdownTimer);
-    app.log.info('MCP HTTP server closed successfully');
-    process.exit(0);
-  } catch (err) {
-    clearTimeout(forceShutdownTimer);
-    const error = err instanceof Error ? err : new Error(String(err));
-    app.log.error(error, 'Error during shutdown');
-    Sentry.withScope((scope) => {
-      scope.setContext('mcp', { context: 'shutdown' });
-      Sentry.captureException(error);
-    });
-    process.exit(1);
-  }
-};
-
-process.on('SIGTERM', () => {
-  void shutdown('SIGTERM');
-});
-
-process.on('SIGINT', () => {
-  void shutdown('SIGINT');
-});
-
-process.on('unhandledRejection', (reason) => {
-  const error = reason instanceof Error ? reason : new Error(String(reason));
-  app.log.error(error, 'Unhandled Rejection');
-  Sentry.captureException(error);
-});
-
-process.on('uncaughtException', (error) => {
-  app.log.error(error, 'Uncaught Exception');
-  Sentry.captureException(error);
-  void shutdown('uncaughtException');
+setupLifecycle({
+  server: app,
+  closeCache,
+  log: app.log,
+  shutdownSuccessMessage: 'MCP HTTP server closed successfully',
+  sentryContext: { context: 'shutdown', service: 'mcp' },
 });
 
 function isInitializeRequest(body: unknown): body is { method: string } {
