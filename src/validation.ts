@@ -355,8 +355,9 @@ async function downloadWithAutoDiscover(
   const isYouTube = extractYouTubeVideoId(url) !== null;
   const platform = extractPlatformFromUrl(url);
 
-  // 1. Try official subtitles
-  for (const lang of official) {
+  // 1. Try official subtitles (limit to first 3 to avoid O(N) yt-dlp calls)
+  const officialToTry = official.slice(0, 3);
+  for (const lang of officialToTry) {
     const content = await downloadSubtitles(url, 'official', lang, format, logger);
     if (content && content.trim().length > 0) {
       return {
@@ -369,9 +370,10 @@ async function downloadWithAutoDiscover(
     }
   }
 
-  // 2. Try auto subtitles (for YouTube: -orig first)
+  // 2. Try auto subtitles (for YouTube: -orig first; limit to first 3 to avoid O(N) yt-dlp calls)
   const orderedAuto = isYouTube ? orderAutoForYouTube(auto) : auto;
-  for (const lang of orderedAuto) {
+  const autoToTry = orderedAuto.slice(0, 3);
+  for (const lang of autoToTry) {
     const content = await downloadSubtitles(url, 'auto', lang, format, logger);
     if (content && content.trim().length > 0) {
       return {
