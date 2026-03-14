@@ -22,7 +22,7 @@ import {
   validateAndFetchVideoInfo,
   validateAndFetchVideoChapters,
 } from './validation.js';
-import { recordMcpToolCall, recordMcpToolError } from './metrics.js';
+import { recordMcpRequestDuration, recordMcpToolCall, recordMcpToolError } from './metrics.js';
 import { version } from './version.js';
 
 const TOOL_GET_TRANSCRIPT = 'get_transcript';
@@ -270,61 +270,71 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     async (args, _extra) => {
-      let resolved: ReturnType<typeof resolveSubtitleArgs>;
+      const start = performance.now();
       try {
-        resolved = resolveSubtitleArgs(args);
-      } catch (err) {
-        recordMcpToolError(TOOL_GET_TRANSCRIPT);
-        return toolError(err instanceof Error ? err.message : 'Invalid request.');
-      }
-
-      let result: Awaited<ReturnType<typeof validateAndDownloadSubtitles>>;
-      try {
-        result = await validateAndDownloadSubtitles(
-          { url: resolved.url, type: resolved.type, lang: resolved.lang, format: resolved.format },
-          log
-        );
-      } catch (err) {
-        if (err instanceof NotFoundError) {
+        let resolved: ReturnType<typeof resolveSubtitleArgs>;
+        try {
+          resolved = resolveSubtitleArgs(args);
+        } catch (err) {
           recordMcpToolError(TOOL_GET_TRANSCRIPT);
-          return toolError(err.message);
+          return toolError(err instanceof Error ? err.message : 'Invalid request.');
         }
-        if (err instanceof ValidationError) {
+
+        let result: Awaited<ReturnType<typeof validateAndDownloadSubtitles>>;
+        try {
+          result = await validateAndDownloadSubtitles(
+            {
+              url: resolved.url,
+              type: resolved.type,
+              lang: resolved.lang,
+              format: resolved.format,
+            },
+            log
+          );
+        } catch (err) {
+          if (err instanceof NotFoundError) {
+            recordMcpToolError(TOOL_GET_TRANSCRIPT);
+            return toolError(err.message);
+          }
+          if (err instanceof ValidationError) {
+            recordMcpToolError(TOOL_GET_TRANSCRIPT);
+            return toolError(err.message);
+          }
+          log.error({ err, tool: TOOL_GET_TRANSCRIPT }, 'MCP tool unexpected error');
           recordMcpToolError(TOOL_GET_TRANSCRIPT);
-          return toolError(err.message);
+          return toolError(err instanceof Error ? err.message : 'Tool failed.');
         }
-        log.error({ err, tool: TOOL_GET_TRANSCRIPT }, 'MCP tool unexpected error');
-        recordMcpToolError(TOOL_GET_TRANSCRIPT);
-        return toolError(err instanceof Error ? err.message : 'Tool failed.');
-      }
 
-      let plainText: string;
-      try {
-        plainText = parseSubtitles(result.subtitlesContent);
-      } catch (error) {
-        recordMcpToolError(TOOL_GET_TRANSCRIPT);
-        return toolError(
-          error instanceof Error ? error.message : 'Failed to parse subtitles content.'
-        );
-      }
+        let plainText: string;
+        try {
+          plainText = parseSubtitles(result.subtitlesContent);
+        } catch (error) {
+          recordMcpToolError(TOOL_GET_TRANSCRIPT);
+          return toolError(
+            error instanceof Error ? error.message : 'Failed to parse subtitles content.'
+          );
+        }
 
-      recordMcpToolCall(TOOL_GET_TRANSCRIPT);
-      const page = paginateText(plainText, resolved.responseLimit, resolved.nextCursor);
-      return {
-        content: [textContent(page.chunk)],
-        structuredContent: {
-          videoId: result.videoId,
-          type: result.type,
-          lang: result.lang,
-          text: page.chunk,
-          next_cursor: page.nextCursor,
-          is_truncated: page.isTruncated,
-          total_length: page.totalLength,
-          start_offset: page.startOffset,
-          end_offset: page.endOffset,
-          ...(result.source != null && { source: result.source }),
-        },
-      };
+        recordMcpToolCall(TOOL_GET_TRANSCRIPT);
+        const page = paginateText(plainText, resolved.responseLimit, resolved.nextCursor);
+        return {
+          content: [textContent(page.chunk)],
+          structuredContent: {
+            videoId: result.videoId,
+            type: result.type,
+            lang: result.lang,
+            text: page.chunk,
+            next_cursor: page.nextCursor,
+            is_truncated: page.isTruncated,
+            total_length: page.totalLength,
+            start_offset: page.startOffset,
+            end_offset: page.endOffset,
+            ...(result.source != null && { source: result.source }),
+          },
+        };
+      } finally {
+        recordMcpRequestDuration(TOOL_GET_TRANSCRIPT, (performance.now() - start) / 1000);
+      }
     }
   );
 
@@ -344,57 +354,67 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     async (args, _extra) => {
-      let resolved: ReturnType<typeof resolveSubtitleArgs>;
+      const start = performance.now();
       try {
-        resolved = resolveSubtitleArgs(args);
-      } catch (err) {
-        recordMcpToolError(TOOL_GET_RAW_SUBTITLES);
-        return toolError(err instanceof Error ? err.message : 'Invalid request.');
-      }
+        let resolved: ReturnType<typeof resolveSubtitleArgs>;
+        try {
+          resolved = resolveSubtitleArgs(args);
+        } catch (err) {
+          recordMcpToolError(TOOL_GET_RAW_SUBTITLES);
+          return toolError(err instanceof Error ? err.message : 'Invalid request.');
+        }
 
-      let result: Awaited<ReturnType<typeof validateAndDownloadSubtitles>>;
-      try {
-        result = await validateAndDownloadSubtitles(
-          { url: resolved.url, type: resolved.type, lang: resolved.lang, format: resolved.format },
-          log
+        let result: Awaited<ReturnType<typeof validateAndDownloadSubtitles>>;
+        try {
+          result = await validateAndDownloadSubtitles(
+            {
+              url: resolved.url,
+              type: resolved.type,
+              lang: resolved.lang,
+              format: resolved.format,
+            },
+            log
+          );
+        } catch (err) {
+          if (err instanceof NotFoundError) {
+            recordMcpToolError(TOOL_GET_RAW_SUBTITLES);
+            return toolError(err.message);
+          }
+          if (err instanceof ValidationError) {
+            recordMcpToolError(TOOL_GET_RAW_SUBTITLES);
+            return toolError(err.message);
+          }
+          log.error({ err, tool: TOOL_GET_RAW_SUBTITLES }, 'MCP tool unexpected error');
+          recordMcpToolError(TOOL_GET_RAW_SUBTITLES);
+          return toolError(err instanceof Error ? err.message : 'Tool failed.');
+        }
+
+        recordMcpToolCall(TOOL_GET_RAW_SUBTITLES);
+        const format = detectSubtitleFormat(result.subtitlesContent);
+        const page = paginateText(
+          result.subtitlesContent,
+          resolved.responseLimit,
+          resolved.nextCursor
         );
-      } catch (err) {
-        if (err instanceof NotFoundError) {
-          recordMcpToolError(TOOL_GET_RAW_SUBTITLES);
-          return toolError(err.message);
-        }
-        if (err instanceof ValidationError) {
-          recordMcpToolError(TOOL_GET_RAW_SUBTITLES);
-          return toolError(err.message);
-        }
-        log.error({ err, tool: TOOL_GET_RAW_SUBTITLES }, 'MCP tool unexpected error');
-        recordMcpToolError(TOOL_GET_RAW_SUBTITLES);
-        return toolError(err instanceof Error ? err.message : 'Tool failed.');
+        return {
+          content: [textContent(page.chunk)],
+          structuredContent: {
+            videoId: result.videoId,
+            type: result.type,
+            lang: result.lang,
+            format,
+            content: page.chunk,
+            next_cursor: page.nextCursor,
+            is_truncated: page.isTruncated,
+            total_length: page.totalLength,
+            start_offset: page.startOffset,
+            end_offset: page.endOffset,
+            ...(result.source != null && { source: result.source }),
+          },
+        };
+      } finally {
+        recordMcpRequestDuration(TOOL_GET_RAW_SUBTITLES, (performance.now() - start) / 1000);
       }
-
-      recordMcpToolCall(TOOL_GET_RAW_SUBTITLES);
-      const format = detectSubtitleFormat(result.subtitlesContent);
-      const page = paginateText(
-        result.subtitlesContent,
-        resolved.responseLimit,
-        resolved.nextCursor
-      );
-      return {
-        content: [textContent(page.chunk)],
-        structuredContent: {
-          videoId: result.videoId,
-          type: result.type,
-          lang: result.lang,
-          format,
-          content: page.chunk,
-          next_cursor: page.nextCursor,
-          is_truncated: page.isTruncated,
-          total_length: page.totalLength,
-          start_offset: page.startOffset,
-          end_offset: page.endOffset,
-          ...(result.source != null && { source: result.source }),
-        },
-      };
     }
   );
 
@@ -413,45 +433,50 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     async (args, _extra) => {
-      const url = resolveVideoUrl(args.url);
-      if (!url) {
-        recordMcpToolError(TOOL_GET_AVAILABLE_SUBTITLES);
-        return toolError(
-          'Invalid video URL. Use a URL from a supported platform or YouTube video ID.'
-        );
-      }
-
-      let result: Awaited<ReturnType<typeof validateAndFetchAvailableSubtitles>>;
+      const start = performance.now();
       try {
-        result = await validateAndFetchAvailableSubtitles({ url }, log);
-      } catch (err) {
-        if (err instanceof NotFoundError) {
+        const url = resolveVideoUrl(args.url);
+        if (!url) {
           recordMcpToolError(TOOL_GET_AVAILABLE_SUBTITLES);
-          return toolError('Failed to fetch subtitle availability for this video.');
+          return toolError(
+            'Invalid video URL. Use a URL from a supported platform or YouTube video ID.'
+          );
         }
-        if (err instanceof ValidationError) {
+
+        let result: Awaited<ReturnType<typeof validateAndFetchAvailableSubtitles>>;
+        try {
+          result = await validateAndFetchAvailableSubtitles({ url }, log);
+        } catch (err) {
+          if (err instanceof NotFoundError) {
+            recordMcpToolError(TOOL_GET_AVAILABLE_SUBTITLES);
+            return toolError('Failed to fetch subtitle availability for this video.');
+          }
+          if (err instanceof ValidationError) {
+            recordMcpToolError(TOOL_GET_AVAILABLE_SUBTITLES);
+            return toolError(err.message);
+          }
+          log.error({ err, tool: TOOL_GET_AVAILABLE_SUBTITLES }, 'MCP tool unexpected error');
           recordMcpToolError(TOOL_GET_AVAILABLE_SUBTITLES);
-          return toolError(err.message);
+          return toolError(err instanceof Error ? err.message : 'Tool failed.');
         }
-        log.error({ err, tool: TOOL_GET_AVAILABLE_SUBTITLES }, 'MCP tool unexpected error');
-        recordMcpToolError(TOOL_GET_AVAILABLE_SUBTITLES);
-        return toolError(err instanceof Error ? err.message : 'Tool failed.');
+
+        recordMcpToolCall(TOOL_GET_AVAILABLE_SUBTITLES);
+        const text = [
+          `Official: ${result.official.length ? result.official.join(', ') : 'none'}`,
+          `Auto: ${result.auto.length ? result.auto.join(', ') : 'none'}`,
+        ].join('\n');
+
+        return {
+          content: [textContent(text)],
+          structuredContent: {
+            videoId: result.videoId,
+            official: result.official,
+            auto: result.auto,
+          },
+        };
+      } finally {
+        recordMcpRequestDuration(TOOL_GET_AVAILABLE_SUBTITLES, (performance.now() - start) / 1000);
       }
-
-      recordMcpToolCall(TOOL_GET_AVAILABLE_SUBTITLES);
-      const text = [
-        `Official: ${result.official.length ? result.official.join(', ') : 'none'}`,
-        `Auto: ${result.auto.length ? result.auto.join(', ') : 'none'}`,
-      ].join('\n');
-
-      return {
-        content: [textContent(text)],
-        structuredContent: {
-          videoId: result.videoId,
-          official: result.official,
-          auto: result.auto,
-        },
-      };
     }
   );
 
@@ -471,72 +496,77 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     async (args, _extra) => {
-      const url = resolveVideoUrl(args.url);
-      if (!url) {
-        recordMcpToolError(TOOL_GET_VIDEO_INFO);
-        return toolError(
-          'Invalid video URL. Use a URL from a supported platform or YouTube video ID.'
-        );
-      }
-
-      let result: Awaited<ReturnType<typeof validateAndFetchVideoInfo>>;
+      const start = performance.now();
       try {
-        result = await validateAndFetchVideoInfo({ url }, log);
-      } catch (err) {
-        if (err instanceof NotFoundError) {
+        const url = resolveVideoUrl(args.url);
+        if (!url) {
+          recordMcpToolError(TOOL_GET_VIDEO_INFO);
+          return toolError(
+            'Invalid video URL. Use a URL from a supported platform or YouTube video ID.'
+          );
+        }
+
+        let result: Awaited<ReturnType<typeof validateAndFetchVideoInfo>>;
+        try {
+          result = await validateAndFetchVideoInfo({ url }, log);
+        } catch (err) {
+          if (err instanceof NotFoundError) {
+            recordMcpToolError(TOOL_GET_VIDEO_INFO);
+            return toolError('Failed to fetch video info.');
+          }
+          if (err instanceof ValidationError) {
+            recordMcpToolError(TOOL_GET_VIDEO_INFO);
+            return toolError(err.message);
+          }
+          log.error({ err, tool: TOOL_GET_VIDEO_INFO }, 'MCP tool unexpected error');
+          recordMcpToolError(TOOL_GET_VIDEO_INFO);
+          return toolError(err instanceof Error ? err.message : 'Tool failed.');
+        }
+
+        const { videoId, info } = result;
+        if (!info) {
           recordMcpToolError(TOOL_GET_VIDEO_INFO);
           return toolError('Failed to fetch video info.');
         }
-        if (err instanceof ValidationError) {
-          recordMcpToolError(TOOL_GET_VIDEO_INFO);
-          return toolError(err.message);
-        }
-        log.error({ err, tool: TOOL_GET_VIDEO_INFO }, 'MCP tool unexpected error');
-        recordMcpToolError(TOOL_GET_VIDEO_INFO);
-        return toolError(err instanceof Error ? err.message : 'Tool failed.');
-      }
+        recordMcpToolCall(TOOL_GET_VIDEO_INFO);
+        const textLines = [
+          info.title ? `Title: ${info.title}` : null,
+          info.channel ? `Channel: ${info.channel}` : null,
+          info.duration === null ? null : `Duration: ${info.duration}s`,
+          info.viewCount !== null ? `Views: ${info.viewCount}` : null,
+          info.webpageUrl ? `URL: ${info.webpageUrl}` : null,
+        ].filter(Boolean) as string[];
 
-      const { videoId, info } = result;
-      if (!info) {
-        recordMcpToolError(TOOL_GET_VIDEO_INFO);
-        return toolError('Failed to fetch video info.');
+        return {
+          content: [textContent(textLines.join('\n'))],
+          structuredContent: {
+            videoId,
+            title: info.title,
+            uploader: info.uploader,
+            uploaderId: info.uploaderId,
+            channel: info.channel,
+            channelId: info.channelId,
+            channelUrl: info.channelUrl,
+            duration: info.duration,
+            description: info.description,
+            uploadDate: info.uploadDate,
+            webpageUrl: info.webpageUrl,
+            viewCount: info.viewCount,
+            likeCount: info.likeCount,
+            commentCount: info.commentCount,
+            tags: info.tags,
+            categories: info.categories,
+            liveStatus: info.liveStatus,
+            isLive: info.isLive,
+            wasLive: info.wasLive,
+            availability: info.availability,
+            thumbnail: info.thumbnail,
+            thumbnails: info.thumbnails,
+          },
+        };
+      } finally {
+        recordMcpRequestDuration(TOOL_GET_VIDEO_INFO, (performance.now() - start) / 1000);
       }
-      recordMcpToolCall(TOOL_GET_VIDEO_INFO);
-      const textLines = [
-        info.title ? `Title: ${info.title}` : null,
-        info.channel ? `Channel: ${info.channel}` : null,
-        info.duration === null ? null : `Duration: ${info.duration}s`,
-        info.viewCount !== null ? `Views: ${info.viewCount}` : null,
-        info.webpageUrl ? `URL: ${info.webpageUrl}` : null,
-      ].filter(Boolean) as string[];
-
-      return {
-        content: [textContent(textLines.join('\n'))],
-        structuredContent: {
-          videoId,
-          title: info.title,
-          uploader: info.uploader,
-          uploaderId: info.uploaderId,
-          channel: info.channel,
-          channelId: info.channelId,
-          channelUrl: info.channelUrl,
-          duration: info.duration,
-          description: info.description,
-          uploadDate: info.uploadDate,
-          webpageUrl: info.webpageUrl,
-          viewCount: info.viewCount,
-          likeCount: info.likeCount,
-          commentCount: info.commentCount,
-          tags: info.tags,
-          categories: info.categories,
-          liveStatus: info.liveStatus,
-          isLive: info.isLive,
-          wasLive: info.wasLive,
-          availability: info.availability,
-          thumbnail: info.thumbnail,
-          thumbnails: info.thumbnails,
-        },
-      };
     }
   );
 
@@ -555,47 +585,52 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     async (args, _extra) => {
-      const url = resolveVideoUrl(args.url);
-      if (!url) {
-        recordMcpToolError(TOOL_GET_VIDEO_CHAPTERS);
-        return toolError(
-          'Invalid video URL. Use a URL from a supported platform or YouTube video ID.'
-        );
-      }
-
-      let result: Awaited<ReturnType<typeof validateAndFetchVideoChapters>>;
+      const start = performance.now();
       try {
-        result = await validateAndFetchVideoChapters({ url }, log);
-      } catch (err) {
-        if (err instanceof NotFoundError) {
+        const url = resolveVideoUrl(args.url);
+        if (!url) {
           recordMcpToolError(TOOL_GET_VIDEO_CHAPTERS);
-          return toolError('Failed to fetch chapters for this video.');
+          return toolError(
+            'Invalid video URL. Use a URL from a supported platform or YouTube video ID.'
+          );
         }
-        if (err instanceof ValidationError) {
+
+        let result: Awaited<ReturnType<typeof validateAndFetchVideoChapters>>;
+        try {
+          result = await validateAndFetchVideoChapters({ url }, log);
+        } catch (err) {
+          if (err instanceof NotFoundError) {
+            recordMcpToolError(TOOL_GET_VIDEO_CHAPTERS);
+            return toolError('Failed to fetch chapters for this video.');
+          }
+          if (err instanceof ValidationError) {
+            recordMcpToolError(TOOL_GET_VIDEO_CHAPTERS);
+            return toolError(err.message);
+          }
+          log.error({ err, tool: TOOL_GET_VIDEO_CHAPTERS }, 'MCP tool unexpected error');
           recordMcpToolError(TOOL_GET_VIDEO_CHAPTERS);
-          return toolError(err.message);
+          return toolError(err instanceof Error ? err.message : 'Tool failed.');
         }
-        log.error({ err, tool: TOOL_GET_VIDEO_CHAPTERS }, 'MCP tool unexpected error');
-        recordMcpToolError(TOOL_GET_VIDEO_CHAPTERS);
-        return toolError(err instanceof Error ? err.message : 'Tool failed.');
+
+        recordMcpToolCall(TOOL_GET_VIDEO_CHAPTERS);
+        const chapters = result.chapters ?? [];
+        const text =
+          chapters.length === 0
+            ? 'No chapters found.'
+            : chapters
+                .map((ch: VideoChapter) => `${ch.startTime}s - ${ch.endTime}s: ${ch.title}`)
+                .join('\n');
+
+        return {
+          content: [textContent(text)],
+          structuredContent: {
+            videoId: result.videoId,
+            chapters,
+          },
+        };
+      } finally {
+        recordMcpRequestDuration(TOOL_GET_VIDEO_CHAPTERS, (performance.now() - start) / 1000);
       }
-
-      recordMcpToolCall(TOOL_GET_VIDEO_CHAPTERS);
-      const chapters = result.chapters ?? [];
-      const text =
-        chapters.length === 0
-          ? 'No chapters found.'
-          : chapters
-              .map((ch: VideoChapter) => `${ch.startTime}s - ${ch.endTime}s: ${ch.title}`)
-              .join('\n');
-
-      return {
-        content: [textContent(text)],
-        structuredContent: {
-          videoId: result.videoId,
-          chapters,
-        },
-      };
     }
   );
 
@@ -613,58 +648,65 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     async (args, _extra) => {
-      const url = resolveVideoUrl(args.url);
-      if (!url) {
-        recordMcpToolError(TOOL_GET_PLAYLIST_TRANSCRIPTS);
-        return toolError(
-          'Invalid URL. Use a playlist URL (e.g. youtube.com/playlist?list=XXX) or watch URL with list= parameter.'
-        );
-      }
-
-      const lang = args.lang ? (sanitizeLang(args.lang) ?? 'en') : 'en';
-
-      const format =
-        args.format && ['srt', 'vtt', 'ass', 'lrc'].includes(args.format) ? args.format : undefined;
-      let rawResults: Awaited<ReturnType<typeof downloadPlaylistSubtitles>>;
+      const start = performance.now();
       try {
-        rawResults = await downloadPlaylistSubtitles(
-          url,
-          {
-            type: args.type ?? 'auto',
-            lang,
-            format,
-            playlistItems: args.playlistItems,
-            maxItems: args.maxItems,
-          },
-          log
-        );
-      } catch (err) {
-        log.error({ err, tool: TOOL_GET_PLAYLIST_TRANSCRIPTS }, 'MCP tool unexpected error');
-        recordMcpToolError(TOOL_GET_PLAYLIST_TRANSCRIPTS);
-        return toolError(err instanceof Error ? err.message : 'Tool failed.');
+        const url = resolveVideoUrl(args.url);
+        if (!url) {
+          recordMcpToolError(TOOL_GET_PLAYLIST_TRANSCRIPTS);
+          return toolError(
+            'Invalid URL. Use a playlist URL (e.g. youtube.com/playlist?list=XXX) or watch URL with list= parameter.'
+          );
+        }
+
+        const lang = args.lang ? (sanitizeLang(args.lang) ?? 'en') : 'en';
+
+        const format =
+          args.format && ['srt', 'vtt', 'ass', 'lrc'].includes(args.format)
+            ? args.format
+            : undefined;
+        let rawResults: Awaited<ReturnType<typeof downloadPlaylistSubtitles>>;
+        try {
+          rawResults = await downloadPlaylistSubtitles(
+            url,
+            {
+              type: args.type ?? 'auto',
+              lang,
+              format,
+              playlistItems: args.playlistItems,
+              maxItems: args.maxItems,
+            },
+            log
+          );
+        } catch (err) {
+          log.error({ err, tool: TOOL_GET_PLAYLIST_TRANSCRIPTS }, 'MCP tool unexpected error');
+          recordMcpToolError(TOOL_GET_PLAYLIST_TRANSCRIPTS);
+          return toolError(err instanceof Error ? err.message : 'Tool failed.');
+        }
+
+        if (rawResults === null) {
+          recordMcpToolError(TOOL_GET_PLAYLIST_TRANSCRIPTS);
+          return toolError('Failed to fetch playlist subtitles.');
+        }
+
+        recordMcpToolCall(TOOL_GET_PLAYLIST_TRANSCRIPTS);
+
+        const results = rawResults.map((r) => ({
+          videoId: r.videoId,
+          text: parseSubtitles(r.content, log),
+        }));
+
+        const text =
+          results.length === 0
+            ? 'No transcripts found.'
+            : results.map((r) => `[${r.videoId}]\n${r.text}`).join('\n\n---\n\n');
+
+        return {
+          content: [textContent(text)],
+          structuredContent: { results },
+        };
+      } finally {
+        recordMcpRequestDuration(TOOL_GET_PLAYLIST_TRANSCRIPTS, (performance.now() - start) / 1000);
       }
-
-      if (rawResults === null) {
-        recordMcpToolError(TOOL_GET_PLAYLIST_TRANSCRIPTS);
-        return toolError('Failed to fetch playlist subtitles.');
-      }
-
-      recordMcpToolCall(TOOL_GET_PLAYLIST_TRANSCRIPTS);
-
-      const results = rawResults.map((r) => ({
-        videoId: r.videoId,
-        text: parseSubtitles(r.content, log),
-      }));
-
-      const text =
-        results.length === 0
-          ? 'No transcripts found.'
-          : results.map((r) => `[${r.videoId}]\n${r.text}`).join('\n\n---\n\n');
-
-      return {
-        content: [textContent(text)],
-        structuredContent: { results },
-      };
     }
   );
 
@@ -684,62 +726,67 @@ export function createMcpServer(opts?: CreateMcpServerOptions) {
       annotations: { readOnlyHint: true, idempotentHint: false },
     },
     async (args, _extra) => {
-      const query = typeof args.query === 'string' ? args.query.trim() : '';
-      if (!query) {
-        recordMcpToolError(TOOL_SEARCH_VIDEOS);
-        return toolError('Query is required for search.');
-      }
-
-      const limit = args.limit ?? 10;
-      const sanitizedLimit = Math.min(Math.max(limit, 1), 50);
-      const offset = Math.max(0, args.offset ?? 0);
-      const dateAfter = args.uploadDateFilter
-        ? UPLOAD_DATE_FILTER_TO_YTDLP[args.uploadDateFilter]
-        : undefined;
-      const format = args.response_format ?? 'json';
-
-      let results: Awaited<ReturnType<typeof searchVideos>>;
+      const start = performance.now();
       try {
-        results = await searchVideos(query, sanitizedLimit, log, {
-          offset: offset > 0 ? offset : undefined,
-          dateAfter,
-          dateBefore: args.dateBefore,
-          date: args.date,
-          matchFilter: args.matchFilter,
-        });
-      } catch (err) {
-        log.error({ err, tool: TOOL_SEARCH_VIDEOS }, 'MCP tool unexpected error');
-        recordMcpToolError(TOOL_SEARCH_VIDEOS);
-        return toolError(err instanceof Error ? err.message : 'Tool failed.');
+        const query = typeof args.query === 'string' ? args.query.trim() : '';
+        if (!query) {
+          recordMcpToolError(TOOL_SEARCH_VIDEOS);
+          return toolError('Query is required for search.');
+        }
+
+        const limit = args.limit ?? 10;
+        const sanitizedLimit = Math.min(Math.max(limit, 1), 50);
+        const offset = Math.max(0, args.offset ?? 0);
+        const dateAfter = args.uploadDateFilter
+          ? UPLOAD_DATE_FILTER_TO_YTDLP[args.uploadDateFilter]
+          : undefined;
+        const format = args.response_format ?? 'json';
+
+        let results: Awaited<ReturnType<typeof searchVideos>>;
+        try {
+          results = await searchVideos(query, sanitizedLimit, log, {
+            offset: offset > 0 ? offset : undefined,
+            dateAfter,
+            dateBefore: args.dateBefore,
+            date: args.date,
+            matchFilter: args.matchFilter,
+          });
+        } catch (err) {
+          log.error({ err, tool: TOOL_SEARCH_VIDEOS }, 'MCP tool unexpected error');
+          recordMcpToolError(TOOL_SEARCH_VIDEOS);
+          return toolError(err instanceof Error ? err.message : 'Tool failed.');
+        }
+
+        if (results === null) {
+          recordMcpToolError(TOOL_SEARCH_VIDEOS);
+          return toolError('Failed to search videos.');
+        }
+
+        recordMcpToolCall(TOOL_SEARCH_VIDEOS);
+        const text =
+          results.length === 0
+            ? 'No results found.'
+            : format === 'markdown'
+              ? results
+                  .map(
+                    (r, i) =>
+                      `${i + 1}. **${(r.title ?? 'Untitled').replace(/\*\*/g, '')}**\n   Channel: ${r.uploader ?? '—'}\n   Duration: ${r.duration != null ? `${r.duration}s` : '—'}\n   URL: ${r.url ?? '—'}${r.viewCount != null ? `\n   Views: ${r.viewCount}` : ''}`
+                  )
+                  .join('\n\n')
+              : results
+                  .map(
+                    (r) =>
+                      `- ${r.title ?? 'Untitled'} (${r.videoId}): ${r.url ?? ''} | ${r.uploader ?? ''} | ${r.viewCount != null ? `${r.viewCount} views` : ''}`
+                  )
+                  .join('\n');
+
+        return {
+          content: [textContent(text)],
+          structuredContent: { results },
+        };
+      } finally {
+        recordMcpRequestDuration(TOOL_SEARCH_VIDEOS, (performance.now() - start) / 1000);
       }
-
-      if (results === null) {
-        recordMcpToolError(TOOL_SEARCH_VIDEOS);
-        return toolError('Failed to search videos.');
-      }
-
-      recordMcpToolCall(TOOL_SEARCH_VIDEOS);
-      const text =
-        results.length === 0
-          ? 'No results found.'
-          : format === 'markdown'
-            ? results
-                .map(
-                  (r, i) =>
-                    `${i + 1}. **${(r.title ?? 'Untitled').replace(/\*\*/g, '')}**\n   Channel: ${r.uploader ?? '—'}\n   Duration: ${r.duration != null ? `${r.duration}s` : '—'}\n   URL: ${r.url ?? '—'}${r.viewCount != null ? `\n   Views: ${r.viewCount}` : ''}`
-                )
-                .join('\n\n')
-            : results
-                .map(
-                  (r) =>
-                    `- ${r.title ?? 'Untitled'} (${r.videoId}): ${r.url ?? ''} | ${r.uploader ?? ''} | ${r.viewCount != null ? `${r.viewCount} views` : ''}`
-                )
-                .join('\n');
-
-      return {
-        content: [textContent(text)],
-        structuredContent: { results },
-      };
     }
   );
 
