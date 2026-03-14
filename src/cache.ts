@@ -23,11 +23,9 @@ interface RedisLike {
 
 let redisClient: RedisLike | null = null;
 
-/**
- * Reads cache configuration from environment.
- * Exported for testing.
- */
-export function getCacheConfig(): CacheConfig {
+let cachedConfig: CacheConfig | undefined;
+
+function computeCacheConfig(): CacheConfig {
   const raw = process.env.CACHE_MODE?.trim().toLowerCase();
   const mode: CacheMode = raw === 'redis' ? 'redis' : 'off';
 
@@ -40,6 +38,23 @@ export function getCacheConfig(): CacheConfig {
     ttlSubtitlesSeconds: ttlSubtitles,
     ttlMetadataSeconds: ttlMetadata,
   };
+}
+
+/**
+ * Reads cache configuration from environment.
+ * Cached as lazy singleton since env vars do not change at runtime.
+ * Exported for testing.
+ */
+export function getCacheConfig(): CacheConfig {
+  cachedConfig ??= computeCacheConfig();
+  return cachedConfig;
+}
+
+/**
+ * Resets the cached config. For testing only; allows tests to exercise different env values.
+ */
+export function resetCacheConfigForTests(): void {
+  cachedConfig = undefined;
 }
 
 function getRedisClient(): RedisLike | null {

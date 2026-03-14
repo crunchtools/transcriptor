@@ -1,10 +1,11 @@
-import { getCacheConfig, get, set, close, ping } from './cache.js';
+import { getCacheConfig, get, set, close, ping, resetCacheConfigForTests } from './cache.js';
 
 const originalEnv = process.env;
 
 beforeEach(() => {
   jest.restoreAllMocks();
   process.env = { ...originalEnv };
+  resetCacheConfigForTests();
 });
 
 afterAll(() => {
