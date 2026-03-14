@@ -233,7 +233,7 @@ export async function downloadSubtitles(
   try {
     await logCookiesFileStatus(logger, cookiesFilePathFromEnv);
     const subFlag = type === 'official' ? '--write-subs' : '--write-auto-subs';
-    const args = [
+    const baseArgs = [
       subFlag,
       '--skip-download',
       '--sub-lang',
@@ -242,15 +242,15 @@ export async function downloadSubtitles(
       '--output',
       `${outputPath}.%(ext)s`,
       '--no-playlist',
-      url,
     ];
-
-    appendYtDlpEnvArgs(args, {
+    const optionalArgs: string[] = [];
+    appendYtDlpEnvArgs(optionalArgs, {
       jsRuntimes,
       remoteComponents,
       cookiesFilePathFromEnv: cookiesPathToUse,
     });
-    appendYtDlpSubtitleArgs(args);
+    appendYtDlpSubtitleArgs(optionalArgs);
+    const args = [...baseArgs, ...optionalArgs, url];
 
     logger?.info(
       { type, lang, format: subFormat, hasCookies: Boolean(cookiesFilePathFromEnv) },
@@ -321,7 +321,6 @@ function buildPlaylistDownloadArgs(opts: {
   if (downloadArchive) {
     args.push('--download-archive', downloadArchive, '--break-on-existing');
   }
-  args.push(opts.url);
   return args;
 }
 
@@ -408,7 +407,7 @@ export async function downloadPlaylistSubtitles(
     await mkdir(tempDir, { recursive: true });
     await logCookiesFileStatus(logger, cookiesFilePathFromEnv);
 
-    const args = buildPlaylistDownloadArgs({
+    const baseArgs = buildPlaylistDownloadArgs({
       type,
       lang,
       subFormat,
@@ -417,12 +416,14 @@ export async function downloadPlaylistSubtitles(
       maxItems,
       url,
     });
-    appendYtDlpEnvArgs(args, {
+    const optionalArgs: string[] = [];
+    appendYtDlpEnvArgs(optionalArgs, {
       jsRuntimes,
       remoteComponents,
       cookiesFilePathFromEnv: cookiesPathToUse,
     });
-    appendYtDlpSubtitleArgs(args);
+    appendYtDlpSubtitleArgs(optionalArgs);
+    const args = [...baseArgs, ...optionalArgs, url];
 
     logger?.info(
       {
@@ -576,7 +577,7 @@ export async function downloadAudio(
   const audioQualityNum = parseIntEnv('YT_DLP_AUDIO_QUALITY', 5);
   const audioQuality = audioQualityNum < 0 || audioQualityNum > 9 ? '5' : String(audioQualityNum);
 
-  const args = [
+  const baseArgs = [
     '-f',
     audioFormat,
     '--extract-audio',
@@ -587,20 +588,20 @@ export async function downloadAudio(
     '--output',
     outputTemplate,
     '--no-playlist',
-    url,
   ];
+  const optionalArgs: string[] = [];
   const maxFilesize = process.env.YT_DLP_MAX_FILESIZE?.trim();
   if (maxFilesize) {
-    args.splice(-1, 0, '--max-filesize', maxFilesize);
+    optionalArgs.push('--max-filesize', maxFilesize);
   }
-  appendYtDlpEnvArgs(args, {
+  appendYtDlpEnvArgs(optionalArgs, {
     jsRuntimes,
     remoteComponents,
     cookiesFilePathFromEnv: cookiesPathToUse,
     proxyFromEnv,
   });
-
-  appendYtDlpAudioArgs(args);
+  appendYtDlpAudioArgs(optionalArgs);
+  const args = [...baseArgs, ...optionalArgs, url];
 
   try {
     await logCookiesFileStatus(logger, cookiesFilePathFromEnv);
@@ -769,9 +770,15 @@ export async function ensureWritableCookiesFile(
   }
 }
 
+/**
+ * Appends yt-dlp env/options args to the given array.
+ * Callers should build final args as: [...baseArgs, ...optionalArgs, url].
+ *
+ * @param out - Array to push options into (inserted before URL in final args)
+ */
 // Exported for testing.
 export function appendYtDlpEnvArgs(
-  args: string[],
+  out: string[],
   env: {
     jsRuntimes?: string;
     remoteComponents?: string;
@@ -779,122 +786,121 @@ export function appendYtDlpEnvArgs(
     proxyFromEnv?: string;
   }
 ) {
-  args.splice(-1, 0, '--no-progress', '--quiet');
+  out.push('--no-progress', '--quiet');
 
   if (process.env.YT_DLP_NO_WARNINGS === '1') {
-    args.splice(-1, 0, '--no-warnings');
+    out.push('--no-warnings');
   }
 
   if (env.cookiesFilePathFromEnv) {
-    args.splice(-1, 0, '--cookies', env.cookiesFilePathFromEnv);
+    out.push('--cookies', env.cookiesFilePathFromEnv);
   }
 
   if (env.proxyFromEnv) {
-    args.splice(-1, 0, '--proxy', env.proxyFromEnv);
+    out.push('--proxy', env.proxyFromEnv);
   }
 
   if (env.jsRuntimes) {
-    args.splice(-1, 0, '--js-runtimes', env.jsRuntimes);
+    out.push('--js-runtimes', env.jsRuntimes);
   }
 
   if (env.remoteComponents) {
-    args.splice(-1, 0, '--remote-components', env.remoteComponents);
+    out.push('--remote-components', env.remoteComponents);
   }
 
   const retries = process.env.YT_DLP_RETRIES?.trim();
   if (retries) {
-    args.splice(-1, 0, '-R', retries);
+    out.push('-R', retries);
   }
 
   const retrySleep = process.env.YT_DLP_RETRY_SLEEP?.trim();
   if (retrySleep) {
-    args.splice(-1, 0, '--retry-sleep', retrySleep);
+    out.push('--retry-sleep', retrySleep);
   }
 
   const sleepRequests = process.env.YT_DLP_SLEEP_REQUESTS?.trim();
   if (sleepRequests) {
-    args.splice(-1, 0, '--sleep-requests', sleepRequests);
+    out.push('--sleep-requests', sleepRequests);
   }
 
   const sleepInterval = process.env.YT_DLP_SLEEP_INTERVAL?.trim();
   if (sleepInterval) {
-    args.splice(-1, 0, '--sleep-interval', sleepInterval);
+    out.push('--sleep-interval', sleepInterval);
   }
 
   const maxSleepInterval = process.env.YT_DLP_MAX_SLEEP_INTERVAL?.trim();
   if (maxSleepInterval) {
-    args.splice(-1, 0, '--max-sleep-interval', maxSleepInterval);
+    out.push('--max-sleep-interval', maxSleepInterval);
   }
 
   const sleepSubtitles = process.env.YT_DLP_SLEEP_SUBTITLES?.trim();
   if (sleepSubtitles) {
-    args.splice(-1, 0, '--sleep-subtitles', sleepSubtitles);
+    out.push('--sleep-subtitles', sleepSubtitles);
   }
 
   const extraArgs = process.env.YT_DLP_EXTRA_ARGS?.trim();
   if (extraArgs) {
     const parts = extraArgs.split(/\s+/).filter((p) => p.length > 0);
-    for (let i = parts.length - 1; i >= 0; i--) {
-      args.splice(-1, 0, parts[i]);
-    }
+    out.push(...parts);
   }
 }
 
 /**
  * Appends audio-specific yt-dlp args from env (for Whisper fallback).
- * Called only from downloadAudio. Exported for testing.
+ * Callers should build final args as: [...baseArgs, ...optionalArgs, url].
+ * Exported for testing.
  */
-export function appendYtDlpAudioArgs(args: string[]) {
+export function appendYtDlpAudioArgs(out: string[]) {
   const frags = process.env.YT_DLP_AUDIO_CONCURRENT_FRAGMENTS?.trim();
   if (frags) {
-    args.splice(-1, 0, '-N', frags);
+    out.push('-N', frags);
   }
   const limitRate = process.env.YT_DLP_AUDIO_LIMIT_RATE?.trim();
   if (limitRate) {
-    args.splice(-1, 0, '-r', limitRate);
+    out.push('-r', limitRate);
   }
   const throttledRate = process.env.YT_DLP_AUDIO_THROTTLED_RATE?.trim();
   if (throttledRate) {
-    args.splice(-1, 0, '--throttled-rate', throttledRate);
+    out.push('--throttled-rate', throttledRate);
   }
   const retries = process.env.YT_DLP_AUDIO_RETRIES?.trim();
   if (retries) {
-    args.splice(-1, 0, '-R', retries);
+    out.push('-R', retries);
   }
   const fragmentRetries = process.env.YT_DLP_AUDIO_FRAGMENT_RETRIES?.trim();
   if (fragmentRetries) {
-    args.splice(-1, 0, '--fragment-retries', fragmentRetries);
+    out.push('--fragment-retries', fragmentRetries);
   }
   const retrySleep = process.env.YT_DLP_AUDIO_RETRY_SLEEP?.trim();
   if (retrySleep) {
-    args.splice(-1, 0, '--retry-sleep', retrySleep);
+    out.push('--retry-sleep', retrySleep);
   }
   const bufferSize = process.env.YT_DLP_AUDIO_BUFFER_SIZE?.trim();
   if (bufferSize) {
-    args.splice(-1, 0, '--buffer-size', bufferSize);
+    out.push('--buffer-size', bufferSize);
   }
   const httpChunkSize = process.env.YT_DLP_AUDIO_HTTP_CHUNK_SIZE?.trim();
   if (httpChunkSize) {
-    args.splice(-1, 0, '--http-chunk-size', httpChunkSize);
+    out.push('--http-chunk-size', httpChunkSize);
   }
   const downloader = process.env.YT_DLP_AUDIO_DOWNLOADER?.trim();
   if (downloader) {
-    args.splice(-1, 0, '--downloader', downloader);
+    out.push('--downloader', downloader);
   }
   const downloaderArgs = process.env.YT_DLP_AUDIO_DOWNLOADER_ARGS?.trim();
   if (downloaderArgs) {
-    args.splice(-1, 0, '--downloader-args', downloaderArgs);
+    out.push('--downloader-args', downloaderArgs);
   }
 }
 
 /**
  * Appends subtitle-specific yt-dlp args from env (encoding).
- * Called only from downloadSubtitles and downloadPlaylistSubtitles.
+ * Callers should build final args as: [...baseArgs, ...optionalArgs, url].
  */
-export function appendYtDlpSubtitleArgs(args: string[]) {
+export function appendYtDlpSubtitleArgs(out: string[]) {
   const encoding = process.env.YT_DLP_ENCODING?.trim();
   if (encoding) {
-    args.splice(-1, 0, '--encoding', encoding);
+    out.push('--encoding', encoding);
   }
 }
 
@@ -1016,14 +1022,16 @@ export async function searchVideos(
     cookiesCleanup = resolved.cleanup;
   }
 
-  const args = ['--flat-playlist', '--dump-single-json', '--skip-download', searchUrl];
-  appendSearchOptionsArgs(args, options);
-  appendYtDlpEnvArgs(args, {
+  const baseArgs = ['--flat-playlist', '--dump-single-json', '--skip-download'];
+  const optionalArgs: string[] = [];
+  appendSearchOptionsArgs(optionalArgs, options);
+  appendYtDlpEnvArgs(optionalArgs, {
     jsRuntimes,
     remoteComponents,
     cookiesFilePathFromEnv: cookiesPathToUse,
     proxyFromEnv,
   });
+  const args = [...baseArgs, ...optionalArgs, searchUrl];
 
   try {
     await logCookiesFileStatus(logger, cookiesFilePathFromEnv);
@@ -1084,15 +1092,17 @@ export async function fetchYtDlpJson(
     cookiesCleanup = resolved.cleanup;
   }
 
-  const args = ['--dump-single-json', '--skip-download', '--no-playlist', url];
+  const baseArgs = ['--dump-single-json', '--skip-download', '--no-playlist'];
+  const optionalArgs: string[] = [];
   if (process.env.YT_DLP_IGNORE_NO_FORMATS !== '0') {
-    args.splice(-1, 0, '--ignore-no-formats-error');
+    optionalArgs.push('--ignore-no-formats-error');
   }
-  appendYtDlpEnvArgs(args, {
+  appendYtDlpEnvArgs(optionalArgs, {
     jsRuntimes,
     remoteComponents,
     cookiesFilePathFromEnv: cookiesPathToUse,
   });
+  const args = [...baseArgs, ...optionalArgs, url];
 
   try {
     await logCookiesFileStatus(logger, cookiesFilePathFromEnv);

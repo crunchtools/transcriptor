@@ -635,8 +635,10 @@ today to pay our respects to MCP, which
       expect(env.remoteComponents).toBe('ejs:github');
     });
 
-    it('should insert yt-dlp flags before the URL argument', () => {
-      const args = ['--dump-single-json', '--skip-download', 'https://example.com'];
+    it('should append yt-dlp flags to be placed before the URL argument', () => {
+      const baseArgs = ['--dump-single-json', '--skip-download'];
+      const optionalArgs: string[] = [];
+      const url = 'https://example.com';
 
       const env = {
         jsRuntimes: 'node',
@@ -645,7 +647,8 @@ today to pay our respects to MCP, which
         proxyFromEnv: 'socks5://127.0.0.1:9050',
       };
 
-      appendYtDlpEnvArgs(args, env);
+      appendYtDlpEnvArgs(optionalArgs, env);
+      const args = [...baseArgs, ...optionalArgs, url];
 
       expect(args).toEqual([
         '--dump-single-json',
@@ -695,11 +698,14 @@ today to pay our respects to MCP, which
     });
 
     it('should add --proxy when proxyFromEnv is set and omit when unset', () => {
-      const argsWithProxy = ['--skip-download', 'https://example.com'];
-      appendYtDlpEnvArgs(argsWithProxy, {
+      const baseArgs = ['--skip-download'];
+      const url = 'https://example.com';
+
+      const optionalWithProxy: string[] = [];
+      appendYtDlpEnvArgs(optionalWithProxy, {
         proxyFromEnv: 'http://user:pass@proxy:8080',
       });
-      expect(argsWithProxy).toEqual([
+      expect([...baseArgs, ...optionalWithProxy, url]).toEqual([
         '--skip-download',
         '--no-progress',
         '--quiet',
@@ -708,9 +714,9 @@ today to pay our respects to MCP, which
         'https://example.com',
       ]);
 
-      const argsWithoutProxy = ['--skip-download', 'https://example.com'];
-      appendYtDlpEnvArgs(argsWithoutProxy, {});
-      expect(argsWithoutProxy).toEqual([
+      const optionalWithoutProxy: string[] = [];
+      appendYtDlpEnvArgs(optionalWithoutProxy, {});
+      expect([...baseArgs, ...optionalWithoutProxy, url]).toEqual([
         '--skip-download',
         '--no-progress',
         '--quiet',
@@ -721,8 +727,9 @@ today to pay our respects to MCP, which
     it('should add -R and --retry-sleep when YT_DLP_RETRIES and YT_DLP_RETRY_SLEEP are set', () => {
       process.env.YT_DLP_RETRIES = '15';
       process.env.YT_DLP_RETRY_SLEEP = 'linear=1::2';
-      const args = ['--skip-download', 'https://example.com'];
-      appendYtDlpEnvArgs(args, {});
+      const optionalArgs: string[] = [];
+      appendYtDlpEnvArgs(optionalArgs, {});
+      const args = ['--skip-download', ...optionalArgs, 'https://example.com'];
 
       expect(args).toContain('-R');
       expect(args).toContain('15');
@@ -733,8 +740,9 @@ today to pay our respects to MCP, which
 
     it('should add YT_DLP_EXTRA_ARGS when set', () => {
       process.env.YT_DLP_EXTRA_ARGS = '--no-check-certificate -v';
-      const args = ['--skip-download', 'https://example.com'];
-      appendYtDlpEnvArgs(args, {});
+      const optionalArgs: string[] = [];
+      appendYtDlpEnvArgs(optionalArgs, {});
+      const args = ['--skip-download', ...optionalArgs, 'https://example.com'];
 
       expect(args).toContain('--no-check-certificate');
       expect(args).toContain('-v');
@@ -743,8 +751,9 @@ today to pay our respects to MCP, which
 
     it('should add --no-warnings when YT_DLP_NO_WARNINGS is 1', () => {
       process.env.YT_DLP_NO_WARNINGS = '1';
-      const args = ['--skip-download', 'https://example.com'];
-      appendYtDlpEnvArgs(args, {});
+      const optionalArgs: string[] = [];
+      appendYtDlpEnvArgs(optionalArgs, {});
+      const args = ['--skip-download', ...optionalArgs, 'https://example.com'];
 
       expect(args).toContain('--no-warnings');
       expect(args).toContain('--no-progress');
@@ -757,8 +766,9 @@ today to pay our respects to MCP, which
       process.env.YT_DLP_SLEEP_INTERVAL = '2';
       process.env.YT_DLP_MAX_SLEEP_INTERVAL = '10';
       process.env.YT_DLP_SLEEP_SUBTITLES = '1';
-      const args = ['--skip-download', 'https://example.com'];
-      appendYtDlpEnvArgs(args, {});
+      const optionalArgs: string[] = [];
+      appendYtDlpEnvArgs(optionalArgs, {});
+      const args = ['--skip-download', ...optionalArgs, 'https://example.com'];
 
       expect(args).toContain('--sleep-requests');
       expect(args).toContain('1');
@@ -779,8 +789,9 @@ today to pay our respects to MCP, which
 
     it('should add --encoding when YT_DLP_ENCODING is set', () => {
       process.env.YT_DLP_ENCODING = 'utf-8';
-      const args = ['--sub-format', 'srt', 'https://example.com'];
-      appendYtDlpSubtitleArgs(args);
+      const optionalArgs: string[] = [];
+      appendYtDlpSubtitleArgs(optionalArgs);
+      const args = ['--sub-format', 'srt', ...optionalArgs, 'https://example.com'];
 
       expect(args).toContain('--encoding');
       expect(args).toContain('utf-8');
@@ -788,10 +799,10 @@ today to pay our respects to MCP, which
     });
 
     it('should not add --encoding when YT_DLP_ENCODING is unset', () => {
-      const args = ['--sub-format', 'srt', 'https://example.com'];
-      appendYtDlpSubtitleArgs(args);
+      const optionalArgs: string[] = [];
+      appendYtDlpSubtitleArgs(optionalArgs);
 
-      expect(args).not.toContain('--encoding');
+      expect(optionalArgs).not.toContain('--encoding');
     });
   });
 
@@ -813,8 +824,9 @@ today to pay our respects to MCP, which
       process.env.YT_DLP_AUDIO_CONCURRENT_FRAGMENTS = '8';
       process.env.YT_DLP_AUDIO_LIMIT_RATE = '2M';
       process.env.YT_DLP_AUDIO_FRAGMENT_RETRIES = '20';
-      const args = ['-f', 'bestaudio', 'https://example.com'];
-      appendYtDlpAudioArgs(args);
+      const optionalArgs: string[] = [];
+      appendYtDlpAudioArgs(optionalArgs);
+      const args = ['-f', 'bestaudio', ...optionalArgs, 'https://example.com'];
 
       expect(args).toContain('-N');
       expect(args).toContain('8');
@@ -825,11 +837,11 @@ today to pay our respects to MCP, which
       expect(args[args.length - 1]).toBe('https://example.com');
     });
 
-    it('should not modify args when no audio env vars are set', () => {
-      const args = ['-f', 'bestaudio', 'https://example.com'];
-      appendYtDlpAudioArgs(args);
+    it('should not add args when no audio env vars are set', () => {
+      const optionalArgs: string[] = [];
+      appendYtDlpAudioArgs(optionalArgs);
 
-      expect(args).toEqual(['-f', 'bestaudio', 'https://example.com']);
+      expect(optionalArgs).toEqual([]);
     });
   });
 
