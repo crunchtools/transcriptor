@@ -314,11 +314,20 @@ export function extractPlatformFromUrl(url: string): string {
     if (hostname.includes('vimeo')) return 'vimeo';
     if (hostname.includes('tiktok')) return 'tiktok';
     if (hostname.includes('twitch')) return 'twitch';
-    if (hostname.includes('twitter') || hostname.includes('x.com')) return 'twitter';
+    if (hostname.includes('twitter') || hostname === 'x.com' || hostname.endsWith('.x.com'))
+      return 'twitter';
     if (hostname.includes('instagram')) return 'instagram';
     if (hostname.includes('facebook') || hostname.includes('fb.')) return 'facebook';
     if (hostname.includes('bilibili')) return 'bilibili';
-    if (hostname.includes('vk.')) return 'vk';
+    if (
+      hostname === 'vk.com' ||
+      hostname.endsWith('.vk.com') ||
+      hostname === 'vk.ru' ||
+      hostname.endsWith('.vk.ru') ||
+      hostname === 'vkvideo.ru' ||
+      hostname.endsWith('.vkvideo.ru')
+    )
+      return 'vk';
     if (hostname.includes('dailymotion')) return 'dailymotion';
     return 'unknown';
   } catch {

@@ -93,6 +93,19 @@ describe('validation', () => {
     it('should return vimeo for Vimeo URLs', () => {
       expect(extractPlatformFromUrl('https://vimeo.com/123')).toBe('vimeo');
     });
+    it('should return twitter for x.com (exact match, not fox.com/pixel.com)', () => {
+      expect(extractPlatformFromUrl('https://x.com/user/status/123')).toBe('twitter');
+      expect(extractPlatformFromUrl('https://m.x.com/user/status/123')).toBe('twitter');
+      expect(extractPlatformFromUrl('https://fox.com/video')).toBe('unknown');
+      expect(extractPlatformFromUrl('https://pixel.com/video')).toBe('unknown');
+    });
+    it('should return vk for VK domains (exact match, not avk.com)', () => {
+      expect(extractPlatformFromUrl('https://vk.com/video123')).toBe('vk');
+      expect(extractPlatformFromUrl('https://www.vk.com/video123')).toBe('vk');
+      expect(extractPlatformFromUrl('https://vk.ru/video123')).toBe('vk');
+      expect(extractPlatformFromUrl('https://vkvideo.ru/playlist/123')).toBe('vk');
+      expect(extractPlatformFromUrl('https://avk.com/video')).toBe('unknown');
+    });
     it('should return unknown for unsupported URLs', () => {
       expect(extractPlatformFromUrl('https://example.com/video')).toBe('unknown');
     });
