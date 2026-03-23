@@ -69,6 +69,13 @@ export const whisperRequestsTotal = new Counter({
   registers: [register],
 });
 
+/** In-flight deduplicated background Whisper jobs (see whisper-jobs.ts). */
+export const whisperBackgroundJobsActive = new Gauge({
+  name: 'whisper_background_jobs_active',
+  help: 'Number of in-flight background Whisper transcription jobs',
+  registers: [register],
+});
+
 // MCP metrics (labels set when used from MCP)
 export const mcpToolCallsTotal = new Counter({
   name: 'mcp_tool_calls_total',
@@ -145,6 +152,10 @@ export function recordSubtitlesFailure(url: string): void {
 
 export function recordWhisperRequest(mode: 'local' | 'api'): void {
   whisperRequestsTotal.inc({ mode });
+}
+
+export function setWhisperBackgroundJobsActive(count: number): void {
+  whisperBackgroundJobsActive.set(count);
 }
 
 export function getFailedSubtitlesUrls(): {

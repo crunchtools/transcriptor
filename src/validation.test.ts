@@ -13,11 +13,16 @@ import {
   validateAndFetchVideoChapters,
 } from './validation.js';
 import * as youtube from './youtube.js';
+import { set as cacheSet } from './cache.js';
 import * as whisper from './whisper.js';
+import * as whisperJobs from './whisper-jobs.js';
 
 jest.mock('./whisper.js', () => ({
-  getWhisperConfig: jest.fn(() => ({ mode: 'off' })),
-  transcribeWithWhisper: jest.fn(),
+  getWhisperConfig: jest.fn(() => ({ mode: 'off', timeout: 600_000 })),
+}));
+
+jest.mock('./whisper-jobs.js', () => ({
+  startOrReuseWhisperJob: jest.fn(),
 }));
 
 jest.mock('./cache.js', () => {
@@ -412,8 +417,8 @@ describe('validation', () => {
     it('should return subtitles from Whisper fallback when YouTube has none', async () => {
       jest.spyOn(youtube, 'downloadSubtitles').mockResolvedValue(null);
       jest.spyOn(youtube, 'fetchYtDlpJson').mockResolvedValue({ id: 'dQw4w9WgXcQ' });
-      (whisper.getWhisperConfig as jest.Mock).mockReturnValue({ mode: 'local' });
-      (whisper.transcribeWithWhisper as jest.Mock).mockResolvedValue(
+      (whisper.getWhisperConfig as jest.Mock).mockReturnValue({ mode: 'local', timeout: 600_000 });
+      (whisperJobs.startOrReuseWhisperJob as jest.Mock).mockResolvedValue(
         '1\n00:00:00,000 --> 00:00:01,000\nWhisper transcript'
       );
 
@@ -430,12 +435,49 @@ describe('validation', () => {
         subtitlesContent: '1\n00:00:00,000 --> 00:00:01,000\nWhisper transcript',
         source: 'whisper',
       });
-      expect(whisper.transcribeWithWhisper).toHaveBeenCalledWith(
+      expect(whisperJobs.startOrReuseWhisperJob).toHaveBeenCalledWith(
         'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
         'en',
         'srt',
         undefined
       );
+    });
+
+    it('should call cache.set when Whisper finishes after WHISPER_TIMEOUT (explicit lang)', async () => {
+      (cacheSet as jest.Mock).mockClear();
+      jest.spyOn(youtube, 'downloadSubtitles').mockResolvedValue(null);
+      jest.spyOn(youtube, 'fetchYtDlpJson').mockResolvedValue({ id: 'dQw4w9WgXcQ' });
+      (whisper.getWhisperConfig as jest.Mock).mockReturnValue({ mode: 'local', timeout: 1 });
+
+      let lateResolve!: (v: string | null) => void;
+      const jobPromise = new Promise<string | null>((resolve) => {
+        lateResolve = resolve;
+      });
+      (whisperJobs.startOrReuseWhisperJob as jest.Mock).mockReturnValue(jobPromise);
+
+      const p = validateAndDownloadSubtitles({
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        type: 'auto',
+        lang: 'en',
+      } as any);
+
+      const rejectsAssert = expect(p).rejects.toThrow(NotFoundError);
+      await new Promise<void>((resolve) => setTimeout(resolve, 15));
+      await rejectsAssert;
+
+      lateResolve('1\n00:00:00,000 --> 00:00:01,000\nLate explicit');
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(cacheSet).toHaveBeenCalled();
+      const payloadCall = (cacheSet as jest.Mock).mock.calls.find(([, v]) =>
+        String(v).includes('Late explicit')
+      );
+      expect(payloadCall).toBeDefined();
+      expect(JSON.parse(String(payloadCall![1]))).toMatchObject({
+        videoId: 'dQw4w9WgXcQ',
+        source: 'whisper',
+        lang: 'en',
+      });
     });
 
     it('should throw NotFoundError when Whisper fallback is enabled but returns null', async () => {
@@ -445,8 +487,8 @@ describe('validation', () => {
         subtitles: {},
         automatic_captions: {},
       });
-      (whisper.getWhisperConfig as jest.Mock).mockReturnValue({ mode: 'local' });
-      (whisper.transcribeWithWhisper as jest.Mock).mockResolvedValue(null);
+      (whisper.getWhisperConfig as jest.Mock).mockReturnValue({ mode: 'local', timeout: 600_000 });
+      (whisperJobs.startOrReuseWhisperJob as jest.Mock).mockResolvedValue(null);
 
       await expect(
         validateAndDownloadSubtitles({
@@ -606,8 +648,11 @@ describe('validation', () => {
           automatic_captions: {},
         });
         jest.spyOn(youtube, 'downloadSubtitles').mockResolvedValue(null);
-        (whisper.getWhisperConfig as jest.Mock).mockReturnValue({ mode: 'local' });
-        (whisper.transcribeWithWhisper as jest.Mock).mockResolvedValue(
+        (whisper.getWhisperConfig as jest.Mock).mockReturnValue({
+          mode: 'local',
+          timeout: 600_000,
+        });
+        (whisperJobs.startOrReuseWhisperJob as jest.Mock).mockResolvedValue(
           '1\n00:00:00,000 --> 00:00:01,000\nWhisper transcript'
         );
 
@@ -620,7 +665,7 @@ describe('validation', () => {
           subtitlesContent: '1\n00:00:00,000 --> 00:00:01,000\nWhisper transcript',
           source: 'whisper',
         });
-        expect(whisper.transcribeWithWhisper).toHaveBeenCalledWith(
+        expect(whisperJobs.startOrReuseWhisperJob).toHaveBeenCalledWith(
           youtubeUrl,
           '',
           'srt',
@@ -635,8 +680,11 @@ describe('validation', () => {
           automatic_captions: {},
         });
         jest.spyOn(youtube, 'downloadSubtitles').mockResolvedValue(null);
-        (whisper.getWhisperConfig as jest.Mock).mockReturnValue({ mode: 'local' });
-        (whisper.transcribeWithWhisper as jest.Mock).mockResolvedValue(null);
+        (whisper.getWhisperConfig as jest.Mock).mockReturnValue({
+          mode: 'local',
+          timeout: 600_000,
+        });
+        (whisperJobs.startOrReuseWhisperJob as jest.Mock).mockResolvedValue(null);
 
         await expect(validateAndDownloadSubtitles({ url: youtubeUrl } as any)).rejects.toThrow(
           NotFoundError
@@ -646,6 +694,45 @@ describe('validation', () => {
         ).rejects.toMatchObject({
           errorLabel: 'Subtitles not found',
           message: expect.stringContaining('No subtitles available'),
+        });
+      });
+
+      it('should call cache.set when Whisper finishes after WHISPER_TIMEOUT (auto-discover)', async () => {
+        (cacheSet as jest.Mock).mockClear();
+        jest.spyOn(youtube, 'fetchYtDlpJson').mockResolvedValue({
+          id: 'dQw4w9WgXcQ',
+          subtitles: {},
+          automatic_captions: {},
+        });
+        jest.spyOn(youtube, 'downloadSubtitles').mockResolvedValue(null);
+        (whisper.getWhisperConfig as jest.Mock).mockReturnValue({
+          mode: 'local',
+          timeout: 1,
+        });
+
+        let lateResolve!: (v: string | null) => void;
+        const jobPromise = new Promise<string | null>((resolve) => {
+          lateResolve = resolve;
+        });
+        (whisperJobs.startOrReuseWhisperJob as jest.Mock).mockReturnValue(jobPromise);
+
+        const p = validateAndDownloadSubtitles({ url: youtubeUrl } as any);
+        const rejectsAssert = expect(p).rejects.toThrow(NotFoundError);
+        await new Promise<void>((resolve) => setTimeout(resolve, 15));
+        await rejectsAssert;
+
+        lateResolve('1\n00:00:00,000 --> 00:00:01,000\nLate transcript');
+        await new Promise<void>((resolve) => setImmediate(resolve));
+
+        expect(cacheSet).toHaveBeenCalled();
+        const payloadCall = (cacheSet as jest.Mock).mock.calls.find(([, v]) =>
+          String(v).includes('Late transcript')
+        );
+        expect(payloadCall).toBeDefined();
+        expect(JSON.parse(String(payloadCall![1]))).toMatchObject({
+          videoId: 'dQw4w9WgXcQ',
+          source: 'whisper',
+          lang: '',
         });
       });
 

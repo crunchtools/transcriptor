@@ -40,6 +40,7 @@ The Grafana Prometheus datasource is provisioned automatically.
 | `cache_misses_total` | Counter | — | Cache misses |
 | `subtitles_extraction_failures_total` | Counter | — | Videos where subtitles could not be obtained (neither YouTube nor Whisper) |
 | `whisper_requests_total` | Counter | mode | Requests to Whisper (transcription attempts; mode=local or api) |
+| `whisper_background_jobs_active` | Gauge | — | In-flight deduplicated background Whisper jobs |
 
 ### MCP HTTP (`service=mcp`)
 
@@ -51,6 +52,7 @@ The Grafana Prometheus datasource is provisioned automatically.
 | `mcp_request_duration_seconds` | Histogram | endpoint | MCP request latency |
 | `subtitles_extraction_failures_total` | Counter | — | Same as API |
 | `whisper_requests_total` | Counter | mode | Same as API |
+| `whisper_background_jobs_active` | Gauge | — | Same as API |
 
 ## Failures endpoint
 

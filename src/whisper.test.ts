@@ -162,6 +162,27 @@ describe('transcribeWithWhisper', () => {
     expect(url).toContain('language=ru');
   });
 
+  it('should omit fetch signal when timeoutMs is 0 (local)', async () => {
+    process.env.WHISPER_MODE = 'local';
+    process.env.WHISPER_BASE_URL = 'http://whisper:9000';
+    jest.spyOn(youtube, 'downloadAudio').mockResolvedValue('/tmp/audio.m4a');
+    (fsPromises.readFile as jest.Mock).mockResolvedValue(Buffer.from('fake-audio'));
+    (fsPromises.unlink as jest.Mock).mockResolvedValue(undefined);
+
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('no-timeout-body'),
+    });
+    globalThis.fetch = fetchMock;
+
+    const result = await transcribeWithWhisper('https://example.com/v', 'en', 'srt', undefined, 0);
+
+    expect(result).toBe('no-timeout-body');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, opts] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(opts.signal).toBeUndefined();
+  });
+
   it('should not add language param when lang is empty (auto-detect)', async () => {
     process.env.WHISPER_MODE = 'local';
     process.env.WHISPER_BASE_URL = 'http://whisper:9000';

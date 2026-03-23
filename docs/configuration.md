@@ -157,7 +157,9 @@ You can enable Whisper fallback to transcribe audio when subtitles are unavailab
 **For local Whisper** (e.g. container `whisper:9000`):
 
 - **`WHISPER_BASE_URL`** – base URL of the Whisper service (e.g. `http://whisper:9000`)
-- **`WHISPER_TIMEOUT`** – request timeout in milliseconds (default: `600000`, 10 min). For 1-hour videos on CPU, set 30–60 minutes (e.g. `3600000`); for 5-hour videos, use `3600000` (1 h) or more.
+- **`WHISPER_TIMEOUT`** – per-request wait in milliseconds (default: `600000`, 10 min): how long the API waits for Whisper before returning “Subtitles not found” to the client. Long transcription can still finish in the background and be written to Redis (when `CACHE_MODE=redis`); see **`WHISPER_BACKGROUND_TIMEOUT`**. For 1-hour videos on CPU, set 30–60 minutes (e.g. `3600000`); for 5-hour videos, use `3600000` (1 h) or more.
+
+- **`WHISPER_BACKGROUND_TIMEOUT`** – max time in milliseconds for the **deduplicated background** Whisper HTTP call (default: `max(1800000, 3 × WHISPER_TIMEOUT)` — at least 30 minutes). Set to `0` to disable the client-side abort on that call (not recommended unless you trust your Whisper service). Shorter than `WHISPER_TIMEOUT` is allowed but usually pointless.
 
 Local mode is compatible with [whisper-asr-webservice](https://github.com/ahmetoner/whisper-asr-webservice): the app sends `POST /asr` with the audio file in the `audio_file` form field and query parameters `output` (srt, vtt, or txt) and optional `language`.
 

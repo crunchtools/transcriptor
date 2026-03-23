@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-03-23
+
+### Added
+
+- **Background Whisper jobs and late cache write:** When the client hits `WHISPER_TIMEOUT` but Whisper finishes afterward, the transcript is still saved to Redis (same subtitle cache keys as a normal success) so the next request for that video can be a cache hit. Implemented via deduplicated in-flight jobs in `src/whisper-jobs.ts` (`startOrReuseWhisperJob`), `Promise.race` against `getWhisperConfig().timeout` in `src/validation.ts` for auto-discovery and explicit `type`/`lang` flows, and optional `timeoutMs` on `transcribeWithWhisper` / local+API helpers (`0` = no `fetch` abort).
+- **`WHISPER_BACKGROUND_TIMEOUT`:** Env var for the long-running Whisper HTTP client used by background jobs (unset = `max(1800000, 3 × WHISPER_TIMEOUT)`; `0` = no client-side abort). Documented in `docs/configuration.md`, `docs/caching.md`, `.env.example`, and `docker-compose.example.yml`.
+- **Prometheus gauge `whisper_background_jobs_active`:** Tracks in-flight deduplicated background Whisper jobs; `setWhisperBackgroundJobsActive()` in `src/metrics.ts`.
+- **Tests:** `src/whisper-jobs.test.ts`; `src/whisper.test.ts` asserts `fetch` is called without `signal` when `timeoutMs === 0`; `src/validation.test.ts` covers `cache.set` after simulated timeout for auto-discover and explicit lang.
+
+### Changed
+
+- **`WHISPER_TIMEOUT` semantics (docs):** Clarified as the per-request wait before returning 404 to the client; background transcription may continue for cache population when Redis is enabled.
+- **`docs/monitoring.md`:** Documented `whisper_background_jobs_active` for API and MCP metrics tables.
+
 ## [0.6.7] - 2026-03-14
 
 ### Added

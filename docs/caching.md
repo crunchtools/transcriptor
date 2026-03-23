@@ -13,6 +13,8 @@ When Redis cache is enabled, the app stores successful responses so that repeate
 
 Only successful responses are cached. Errors (e.g. subtitles not found) are not cached.
 
+**Whisper and late completion:** If the client hits `WHISPER_TIMEOUT` but Whisper finishes later (within `WHISPER_BACKGROUND_TIMEOUT`), the transcript is still stored under the normal subtitle cache key so the next request for the same video can be served from Redis without re-running Whisper.
+
 ## Enabling Redis cache
 
 1. Set `CACHE_MODE=redis`.

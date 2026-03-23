@@ -9,7 +9,8 @@ import {
   fetchYtDlpJson,
   type SubtitleFormat,
 } from './youtube.js';
-import { getWhisperConfig, transcribeWithWhisper } from './whisper.js';
+import { getWhisperConfig } from './whisper.js';
+import { startOrReuseWhisperJob } from './whisper-jobs.js';
 import { getCacheConfig, get, set, buildCacheKey } from './cache.js';
 import { recordCacheHit, recordCacheMiss, recordSubtitlesFailure } from './metrics.js';
 
@@ -339,10 +340,14 @@ export function extractPlatformFromUrl(url: string): string {
  * Auto-discovery: try official → auto (-orig first for YouTube) → all auto → Whisper.
  * @returns subtitle result or null if all attempts failed
  */
+/** When set, a late Whisper result after {@link getWhisperConfig}.timeout is still written to Redis. */
+type WhisperRedisCacheInfo = { key: string; ttl: number };
+
 async function downloadWithAutoDiscover(
   url: string,
   format?: SubtitleFormat,
-  logger?: FastifyBaseLogger
+  logger?: FastifyBaseLogger,
+  whisperRedisCache?: WhisperRedisCacheInfo
 ): Promise<{
   videoId: string;
   type: 'official' | 'auto';
@@ -386,11 +391,40 @@ async function downloadWithAutoDiscover(
     }
   }
 
-  // 3. Whisper fallback
+  // 3. Whisper fallback (background job: survives per-request WHISPER_TIMEOUT for cache)
   const whisperConfig = getWhisperConfig();
   if (whisperConfig.mode !== 'off') {
     logger?.info('Trying Whisper fallback for auto-discovery');
-    const content = await transcribeWithWhisper(url, '', 'srt', logger);
+    const job = startOrReuseWhisperJob(url, '', 'srt', logger);
+    const outcome = await Promise.race([
+      job.then((content) => ({ kind: 'done' as const, content })),
+      new Promise<{ kind: 'timeout' }>((resolve) => {
+        setTimeout(() => resolve({ kind: 'timeout' }), whisperConfig.timeout);
+      }),
+    ]);
+
+    let content: string | null = null;
+    if (outcome.kind === 'timeout') {
+      if (whisperRedisCache) {
+        void job.then((text) => {
+          if (!text?.trim()) {
+            return;
+          }
+          const payload = {
+            videoId,
+            type: 'auto' as const,
+            lang: '',
+            subtitlesContent: text,
+            source: 'whisper',
+          };
+          void set(whisperRedisCache.key, JSON.stringify(payload), whisperRedisCache.ttl);
+        });
+      }
+      content = null;
+    } else {
+      content = outcome.content;
+    }
+
     if (content && content.trim().length > 0) {
       return {
         videoId,
@@ -455,7 +489,10 @@ async function handleAutoDiscoverFlow(
   }
   recordCacheMiss();
 
-  const result = await downloadWithAutoDiscover(url, format, logger);
+  const result = await downloadWithAutoDiscover(url, format, logger, {
+    key: cacheKey,
+    ttl: cacheConfig.ttlSubtitlesSeconds,
+  });
   if (!result) {
     const whisperTried = getWhisperConfig().mode !== 'off';
     await throwNoSubtitlesError({
@@ -506,8 +543,34 @@ async function handleExplicitRequestFlow(
     const whisperConfig = getWhisperConfig();
     if (whisperConfig.mode !== 'off') {
       logger?.info({ lang: sanitizedLang }, 'Trying Whisper fallback');
-      subtitlesContent = await transcribeWithWhisper(url, sanitizedLang, 'srt', logger);
-      source = 'whisper';
+      const job = startOrReuseWhisperJob(url, sanitizedLang, 'srt', logger);
+      const outcome = await Promise.race([
+        job.then((content) => ({ kind: 'done' as const, content })),
+        new Promise<{ kind: 'timeout' }>((resolve) => {
+          setTimeout(() => resolve({ kind: 'timeout' }), whisperConfig.timeout);
+        }),
+      ]);
+
+      if (outcome.kind === 'timeout') {
+        void job.then(async (text) => {
+          if (!text?.trim()) {
+            return;
+          }
+          const data = await fetchYtDlpJson(url, logger);
+          const vid = data?.id ?? extractYouTubeVideoId(url) ?? 'unknown';
+          const whisperResult = {
+            videoId: vid,
+            type,
+            lang: sanitizedLang,
+            subtitlesContent: text,
+            source: 'whisper',
+          };
+          await set(cacheKey, JSON.stringify(whisperResult), cacheConfig.ttlSubtitlesSeconds);
+        });
+      } else if (outcome.content) {
+        subtitlesContent = outcome.content;
+        source = 'whisper';
+      }
     }
   }
 

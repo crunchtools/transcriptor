@@ -54,7 +54,9 @@ export async function transcribeWithWhisperLocal(
   lang: string,
   responseFormat: WhisperResponseFormat,
   config: WhisperConfig,
-  logger?: FastifyBaseLogger
+  logger?: FastifyBaseLogger,
+  /** Per-request timeout in ms. `undefined` uses `config.timeout`. `0` disables client-side abort (no timeout). */
+  timeoutMs?: number
 ): Promise<string | null> {
   if (!config.baseUrl) {
     logger?.warn('WHISPER_BASE_URL is not set for local mode');
@@ -79,17 +81,21 @@ export async function transcribeWithWhisperLocal(
     return null;
   }
 
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
-
-    const res = await fetch(url, {
+    const fetchInit: RequestInit = {
       method: 'POST',
       body,
-      signal: controller.signal,
       headers: {}, // FormData sets Content-Type with boundary
-    });
-    clearTimeout(timeoutId);
+    };
+    if (timeoutMs !== 0) {
+      const controller = new AbortController();
+      const ms = timeoutMs ?? config.timeout;
+      timeoutId = setTimeout(() => controller.abort(), ms);
+      fetchInit.signal = controller.signal;
+    }
+
+    const res = await fetch(url, fetchInit);
 
     if (!res.ok) {
       const errText = await res.text();
@@ -110,6 +116,10 @@ export async function transcribeWithWhisperLocal(
       isTimeout ? 'Whisper request timed out' : 'Whisper request failed (network/service error)'
     );
     return null;
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -122,7 +132,9 @@ export async function transcribeWithWhisperApi(
   lang: string,
   responseFormat: WhisperResponseFormat,
   config: WhisperConfig,
-  logger?: FastifyBaseLogger
+  logger?: FastifyBaseLogger,
+  /** Per-request timeout in ms. `undefined` uses `config.timeout`. `0` disables client-side abort (no timeout). */
+  timeoutMs?: number
 ): Promise<string | null> {
   if (!config.apiKey) {
     logger?.warn('WHISPER_API_KEY is not set for api mode');
@@ -145,19 +157,23 @@ export async function transcribeWithWhisperApi(
     return null;
   }
 
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
-
-    const res = await fetch(url, {
+    const fetchInit: RequestInit = {
       method: 'POST',
       body,
-      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${config.apiKey}`,
       },
-    });
-    clearTimeout(timeoutId);
+    };
+    if (timeoutMs !== 0) {
+      const controller = new AbortController();
+      const ms = timeoutMs ?? config.timeout;
+      timeoutId = setTimeout(() => controller.abort(), ms);
+      fetchInit.signal = controller.signal;
+    }
+
+    const res = await fetch(url, fetchInit);
 
     if (!res.ok) {
       const errText = await res.text();
@@ -180,6 +196,10 @@ export async function transcribeWithWhisperApi(
         : 'Whisper API request failed (network/service error)'
     );
     return null;
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -191,7 +211,9 @@ export async function transcribeWithWhisper(
   url: string,
   lang: string,
   responseFormat: WhisperResponseFormat,
-  logger?: FastifyBaseLogger
+  logger?: FastifyBaseLogger,
+  /** Per-request Whisper HTTP timeout. `undefined` uses env `WHISPER_TIMEOUT`. `0` = no abort (background jobs). */
+  timeoutMs?: number
 ): Promise<string | null> {
   const config = getWhisperConfig();
   if (config.mode === 'off') {
@@ -208,9 +230,23 @@ export async function transcribeWithWhisper(
   try {
     let content: string | null;
     if (config.mode === 'local') {
-      content = await transcribeWithWhisperLocal(audioPath, lang, responseFormat, config, logger);
+      content = await transcribeWithWhisperLocal(
+        audioPath,
+        lang,
+        responseFormat,
+        config,
+        logger,
+        timeoutMs
+      );
     } else {
-      content = await transcribeWithWhisperApi(audioPath, lang, responseFormat, config, logger);
+      content = await transcribeWithWhisperApi(
+        audioPath,
+        lang,
+        responseFormat,
+        config,
+        logger,
+        timeoutMs
+      );
     }
     return content;
   } finally {
