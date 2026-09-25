@@ -1,9 +1,9 @@
 # transcriptor Constitution
 
-> **Version:** 1.0.0
+> **Version:** 1.1.0
 > **Ratified:** 2026-03-25
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.4.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.17.0
 > **Profile:** Forked MCP Server
 
 ## Upstream
@@ -23,3 +23,9 @@
 - Custom Containerfile using Hummingbird Node.js base (upstream uses node:20-slim)
 - Sentry instrumentation removed (no instrument.js import)
 - yt-dlp installed as standalone binary (no Python/Deno in image)
+
+## Quality Gates
+
+Gourmand gates only the Crunchtools delta (Containerfile, our workflows,
+`.specify/`, our config); upstream paths are excluded in
+`.gourmand-exceptions.d/globals.toml` and revisited on each upstream sync.
