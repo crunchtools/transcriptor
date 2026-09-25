@@ -1,0 +1,21 @@
+# Gourmand Configuration
+# AI slop detection for maintaining code quality
+# See https://gitlab.com/mattdm/gourmand for documentation
+#
+# Fork policy (forked-mcp-server profile, RT #1511): this repo is a fork of
+# samson-art/transcriptor-mcp. Application source, tests, docs, packaging, and
+# upstream CI are governed by upstream's own review and linters, so they are
+# excluded and Gourmand gates only the Crunchtools delta: Containerfile, our
+# workflows (container, gatehouse, gourmand), .specify/, and our config.
+# The exclusion list lives in .gourmand-exceptions.d/globals.toml; Gourmand
+# reads [global] excluded_paths from there, not from this file. Paths are
+# listed explicitly (no blanket "**") so anything new we add at the root is
+# still scanned. Revisit the list on every upstream sync.
+
+[checks]
+
+[severity]
+
+[output]
+format = "text"
+color = true

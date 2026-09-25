@@ -1,0 +1,39 @@
+# Gourmand global exclusions. See gourmand.toml for the fork policy (RT #1511):
+# upstream-owned paths are excluded; Gourmand gates only the Crunchtools delta.
+# Revisit on every upstream sync.
+
+[global]
+excluded_paths = [
+    ".git/**",
+    "node_modules/**",
+    "dist/**",
+    "coverage/**",
+    # --- upstream-owned (samson-art/transcriptor-mcp) ---
+    "src/**",
+    "load/**",
+    "docs/**",
+    ".husky/**",
+    ".well-known/**",
+    ".github/workflows/ci.yml",
+    ".github/workflows/publish-docker.yml",
+    "CHANGELOG.md",
+    "README.md",
+    "LICENSE",
+    "Dockerfile",
+    "Makefile",
+    "docker-compose.example.yml",
+    "cookies.example.txt",
+    "eslint.config.mjs",
+    "jest.config.cjs",
+    "tsconfig.json",
+    "package.json",
+    "package-lock.json",
+    "glama.json",
+    "smithery.yaml",
+    "example-usage.webp",
+    "logo.webp",
+    ".env.example",
+    ".dockerignore",
+    ".prettierignore",
+    ".prettierrc.json",
+]
